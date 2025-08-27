@@ -13,20 +13,40 @@ export default function NotificationList({ environment }: NotificationListProps)
   const [notifications, setNotifications] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const itemsPerPage = 20
 
   useEffect(() => {
     loadNotifications()
-  }, [environment, filter])
+  }, [environment, filter, currentPage])
 
   const loadNotifications = async () => {
     setLoading(true)
+    
+    // First get total count
+    let countQuery = supabase
+      .from('notifications_raw')
+      .select('*', { count: 'exact', head: true })
+      .eq('environment', environment === AppleEnvironment.SANDBOX ? 'Sandbox' : 'Production')
+    
+    if (filter !== 'all') {
+      countQuery = countQuery.eq('notification_type', filter)
+    }
+    
+    const { count } = await countQuery
+    setTotalCount(count || 0)
+    
+    // Then get paginated data
+    const from = (currentPage - 1) * itemsPerPage
+    const to = from + itemsPerPage - 1
     
     let query = supabase
       .from('notifications_raw')
       .select('*')
       .eq('environment', environment === AppleEnvironment.SANDBOX ? 'Sandbox' : 'Production')
       .order('received_at', { ascending: false })
-      .limit(100)
+      .range(from, to)
     
     if (filter !== 'all') {
       query = query.eq('notification_type', filter)
@@ -38,6 +58,12 @@ export default function NotificationList({ environment }: NotificationListProps)
       setNotifications(data)
     }
     setLoading(false)
+  }
+
+  const totalPages = Math.ceil(totalCount / itemsPerPage)
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
   }
 
   const getStatusBadge = (status: string) => {
@@ -66,12 +92,20 @@ export default function NotificationList({ environment }: NotificationListProps)
         <div className="flex justify-between items-center">
           <h3 className="text-lg leading-6 font-medium text-gray-900">
             Notifications
+            {totalCount > 0 && (
+              <span className="ml-2 text-sm text-gray-500">
+                ({totalCount} total {totalCount === 1 ? 'record' : 'records'})
+              </span>
+            )}
           </h3>
           
           <div className="flex items-center space-x-2">
             <select
               value={filter}
-              onChange={(e) => setFilter(e.target.value)}
+              onChange={(e) => {
+                setFilter(e.target.value)
+                setCurrentPage(1) // Reset to first page when filter changes
+              }}
               className="px-3 py-1 border border-gray-300 rounded-md text-sm"
             >
               {notificationTypes.map(type => (
@@ -143,6 +177,105 @@ export default function NotificationList({ environment }: NotificationListProps)
           </table>
         )}
       </div>
+      
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="px-4 py-3 border-t border-gray-200 sm:px-6">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 flex justify-between sm:hidden">
+              <button
+                onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage === totalPages}
+                className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm text-gray-700">
+                  Showing{' '}
+                  <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span>{' '}
+                  to{' '}
+                  <span className="font-medium">
+                    {Math.min(currentPage * itemsPerPage, totalCount)}
+                  </span>{' '}
+                  of{' '}
+                  <span className="font-medium">{totalCount}</span>{' '}
+                  results
+                </p>
+              </div>
+              <div>
+                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                  <button
+                    onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <span className="sr-only">Previous</span>
+                    ←
+                  </button>
+                  
+                  {/* Page number buttons */}
+                  {Array.from({ length: Math.min(7, totalPages) }, (_, i) => {
+                    let pageNumber
+                    if (totalPages <= 7) {
+                      pageNumber = i + 1
+                    } else if (currentPage <= 4) {
+                      pageNumber = i + 1
+                    } else if (currentPage >= totalPages - 3) {
+                      pageNumber = totalPages - 6 + i
+                    } else {
+                      pageNumber = currentPage - 3 + i
+                    }
+                    
+                    if (pageNumber === 1 || pageNumber === totalPages || 
+                        (pageNumber >= currentPage - 2 && pageNumber <= currentPage + 2)) {
+                      return (
+                        <button
+                          key={pageNumber}
+                          onClick={() => handlePageChange(pageNumber)}
+                          className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                            currentPage === pageNumber
+                              ? 'z-10 bg-indigo-50 border-indigo-500 text-indigo-600'
+                              : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                          }`}
+                        >
+                          {pageNumber}
+                        </button>
+                      )
+                    } else if ((pageNumber === 2 && currentPage > 4) || 
+                               (pageNumber === totalPages - 1 && currentPage < totalPages - 3)) {
+                      return (
+                        <span key={pageNumber} className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                          ...
+                        </span>
+                      )
+                    }
+                    return null
+                  }).filter(Boolean)}
+                  
+                  <button
+                    onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage === totalPages}
+                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <span className="sr-only">Next</span>
+                    →
+                  </button>
+                </nav>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
