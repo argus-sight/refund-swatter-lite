@@ -1,0 +1,37 @@
+# Supabase project configuration
+
+project_id = "ipvtnhiweddairoakwnv"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+
+[db]
+port = 54322
+
+[storage]
+enabled = true
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false
+
+[functions.webhook]
+verify_jwt = false
+
+[functions.send-consumption]
+verify_jwt = false
+
+[functions.apple-jwt]
+verify_jwt = false
+
+[functions.data-initialization]
+verify_jwt = false
+
+[functions.process-jobs]
+verify_jwt = false

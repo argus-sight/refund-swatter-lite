@@ -1,0 +1,16 @@
+{
+  "name": "refund-swatter-lite",
+  "version": "1.0.0",
+  "description": "Simplified single-tenant Apple App Store refund prevention service",
+  "scripts": {
+    "deploy": "npm run deploy:db && npm run deploy:functions && npm run deploy:web",
+    "deploy:db": "supabase db push",
+    "deploy:functions": "supabase functions deploy",
+    "deploy:web": "cd web && npm install && npm run build",
+    "dev": "cd web && npm run dev",
+    "setup": "./setup.sh"
+  },
+  "keywords": ["apple", "app-store", "refund", "consumption"],
+  "author": "",
+  "license": "Apache-2.0"
+}
