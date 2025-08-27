@@ -325,10 +325,15 @@ serve(async (req) => {
     // Build request body for Apple API
     const requestBody: any = {}
     if (startDate) {
+      // Start date should be at 00:00:00 of that day
       requestBody.startDate = new Date(startDate).getTime()
     }
     if (endDate) {
-      requestBody.endDate = new Date(endDate).getTime()
+      // End date should be at 23:59:59.999 of that day to include the entire day
+      const endDateTime = new Date(endDate)
+      endDateTime.setHours(23, 59, 59, 999)
+      requestBody.endDate = endDateTime.getTime()
+      console.log(`[${requestId}] Adjusted end date to include entire day: ${endDateTime.toISOString()}`)
     }
     if (notificationTypes && notificationTypes.length > 0) {
       requestBody.notificationTypes = notificationTypes
