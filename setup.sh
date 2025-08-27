@@ -51,6 +51,7 @@ supabase functions deploy send-consumption --no-verify-jwt
 supabase functions deploy apple-jwt --no-verify-jwt
 supabase functions deploy data-initialization --no-verify-jwt
 supabase functions deploy process-jobs --no-verify-jwt
+supabase functions deploy apple-notification-history --no-verify-jwt
 
 echo ""
 echo "Step 4: Setting up secrets..."

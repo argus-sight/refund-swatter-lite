@@ -153,8 +153,13 @@ export default function NotificationHistory({ environment }: NotificationHistory
         {result && (
           <div className="mt-4">
             <h3 className="text-sm font-medium text-gray-700 mb-2">
-              Results ({result.notifications?.length || 0} notifications)
+              Results ({result.totalCount || result.notifications?.length || 0} notifications fetched)
             </h3>
+            {result.totalCount > 20 && (
+              <p className="text-xs text-green-600 mb-2">
+                ✓ Successfully fetched all {result.totalCount} notifications across multiple pages
+              </p>
+            )}
             <div className="max-h-96 overflow-y-auto bg-gray-50 rounded p-3">
               {result.notifications && result.notifications.length > 0 ? (
                 <div className="space-y-2">
