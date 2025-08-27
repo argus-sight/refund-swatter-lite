@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { environment, startDate, endDate, notificationTypes, transactionId } = body
+    const { environment, startDate, endDate, notificationType, transactionId } = body
     
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
         environment,
         startDate,
         endDate,
-        notificationTypes,
+        notificationType,  // Changed from notificationTypes to notificationType
         transactionId
       })
     })

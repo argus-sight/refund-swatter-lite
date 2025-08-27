@@ -14,7 +14,7 @@ export default function NotificationHistory({ environment }: NotificationHistory
   const [params, setParams] = useState({
     startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0],
-    notificationTypes: [] as string[],
+    notificationType: '',  // Changed from array to single string
     transactionId: ''
   })
 
@@ -50,13 +50,41 @@ export default function NotificationHistory({ environment }: NotificationHistory
   }
 
   const notificationTypeOptions = [
+    // Refund related
     'CONSUMPTION_REQUEST',
-    'INITIAL_BUY',
-    'DID_RENEW',
     'REFUND',
     'REFUND_DECLINED',
+    'REFUND_REVERSED',
+    
+    // Subscription lifecycle
+    'SUBSCRIBED',
+    'DID_RENEW',
+    'DID_FAIL_TO_RENEW',
+    'EXPIRED',
+    'GRACE_PERIOD_EXPIRED',
+    
+    // Subscription changes
+    'DID_CHANGE_RENEWAL_PREF',
+    'DID_CHANGE_RENEWAL_STATUS',
     'OFFER_REDEEMED',
-    'SUBSCRIBED'
+    'PRICE_INCREASE',
+    'RENEWAL_EXTENDED',
+    'RENEWAL_EXTENSION',
+    
+    // Purchase events
+    'ONE_TIME_CHARGE',
+    'REVOKE',
+    
+    // External purchase
+    'EXTERNAL_PURCHASE_TOKEN',
+    
+    // Advanced Commerce API
+    'METADATA_UPDATE',
+    'MIGRATION',
+    'PRICE_CHANGE',
+    
+    // Testing
+    'TEST'
   ]
 
   return (
@@ -101,39 +129,69 @@ export default function NotificationHistory({ environment }: NotificationHistory
             value={params.transactionId}
             onChange={(e) => setParams({ ...params, transactionId: e.target.value })}
             placeholder="Original transaction ID"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+            disabled={!!params.notificationType}  // Disable if notificationType is selected
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
           />
+          {params.notificationType && (
+            <p className="text-xs text-gray-500 mt-1">
+              Disabled: Cannot use with Notification Type
+            </p>
+          )}
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Notification Types (Optional)
+            Notification Type (Optional - Select One)
           </label>
-          <div className="grid grid-cols-2 gap-2">
-            {notificationTypeOptions.map(type => (
-              <label key={type} className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={params.notificationTypes.includes(type)}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setParams({ 
-                        ...params, 
-                        notificationTypes: [...params.notificationTypes, type] 
-                      })
-                    } else {
-                      setParams({ 
-                        ...params, 
-                        notificationTypes: params.notificationTypes.filter(t => t !== type) 
-                      })
-                    }
-                  }}
-                  className="mr-2"
-                />
-                <span className="text-sm">{type}</span>
-              </label>
-            ))}
-          </div>
+          <select
+            value={params.notificationType}
+            onChange={(e) => setParams({ ...params, notificationType: e.target.value })}
+            disabled={!!params.transactionId}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+          >
+            <option value="">All Types</option>
+            <optgroup label="Refund Related">
+              <option value="CONSUMPTION_REQUEST">CONSUMPTION_REQUEST</option>
+              <option value="REFUND">REFUND</option>
+              <option value="REFUND_DECLINED">REFUND_DECLINED</option>
+              <option value="REFUND_REVERSED">REFUND_REVERSED</option>
+            </optgroup>
+            <optgroup label="Subscription Lifecycle">
+              <option value="SUBSCRIBED">SUBSCRIBED</option>
+              <option value="DID_RENEW">DID_RENEW</option>
+              <option value="DID_FAIL_TO_RENEW">DID_FAIL_TO_RENEW</option>
+              <option value="EXPIRED">EXPIRED</option>
+              <option value="GRACE_PERIOD_EXPIRED">GRACE_PERIOD_EXPIRED</option>
+            </optgroup>
+            <optgroup label="Subscription Changes">
+              <option value="DID_CHANGE_RENEWAL_PREF">DID_CHANGE_RENEWAL_PREF</option>
+              <option value="DID_CHANGE_RENEWAL_STATUS">DID_CHANGE_RENEWAL_STATUS</option>
+              <option value="OFFER_REDEEMED">OFFER_REDEEMED</option>
+              <option value="PRICE_INCREASE">PRICE_INCREASE</option>
+              <option value="RENEWAL_EXTENDED">RENEWAL_EXTENDED</option>
+              <option value="RENEWAL_EXTENSION">RENEWAL_EXTENSION</option>
+            </optgroup>
+            <optgroup label="Purchase Events">
+              <option value="ONE_TIME_CHARGE">ONE_TIME_CHARGE</option>
+              <option value="REVOKE">REVOKE</option>
+            </optgroup>
+            <optgroup label="External Purchase">
+              <option value="EXTERNAL_PURCHASE_TOKEN">EXTERNAL_PURCHASE_TOKEN</option>
+            </optgroup>
+            <optgroup label="Advanced Commerce API">
+              <option value="METADATA_UPDATE">METADATA_UPDATE</option>
+              <option value="MIGRATION">MIGRATION</option>
+              <option value="PRICE_CHANGE">PRICE_CHANGE</option>
+            </optgroup>
+            <optgroup label="Testing">
+              <option value="TEST">TEST</option>
+            </optgroup>
+          </select>
+          {params.transactionId && params.notificationType && (
+            <p className="text-xs text-red-600 mt-1">
+              Cannot use both Transaction ID and Notification Type together
+            </p>
+          )}
         </div>
 
         {error && (

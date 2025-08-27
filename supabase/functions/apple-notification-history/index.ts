@@ -302,7 +302,7 @@ serve(async (req) => {
       environment = 'production', 
       startDate, 
       endDate, 
-      notificationTypes, 
+      notificationType,  // Changed from notificationTypes (plural) to notificationType (singular)
       transactionId 
     } = body
 
@@ -310,8 +310,23 @@ serve(async (req) => {
     console.log(`[${requestId}] - Environment: ${environment}`)
     console.log(`[${requestId}] - Start Date: ${startDate || 'not specified'}`)
     console.log(`[${requestId}] - End Date: ${endDate || 'not specified'}`)
-    console.log(`[${requestId}] - Notification Types: ${notificationTypes?.join(', ') || 'all types'}`)
+    console.log(`[${requestId}] - Notification Type: ${notificationType || 'all types'}`)  // Updated log
     console.log(`[${requestId}] - Transaction ID: ${transactionId || 'not specified'}`)
+    
+    // Validate that both transactionId and notificationType are not provided together
+    if (transactionId && notificationType) {
+      console.error(`[${requestId}] Error: Cannot provide both transactionId and notificationType`)
+      return new Response(
+        JSON.stringify({ 
+          error: 'Cannot provide both transactionId and notificationType. Choose one or neither.',
+          requestId
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400 
+        }
+      )
+    }
 
     // Initialize Supabase client
     console.log(`[${requestId}] Initializing Supabase client...`)
@@ -335,8 +350,8 @@ serve(async (req) => {
       requestBody.endDate = endDateTime.getTime()
       console.log(`[${requestId}] Adjusted end date to include entire day: ${endDateTime.toISOString()}`)
     }
-    if (notificationTypes && notificationTypes.length > 0) {
-      requestBody.notificationTypes = notificationTypes
+    if (notificationType) {
+      requestBody.notificationType = notificationType  // Use singular form as per Apple API spec
     }
     if (transactionId) {
       requestBody.originalTransactionId = transactionId
