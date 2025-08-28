@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { AppleEnvironment } from '@/lib/apple'
 import { format } from 'date-fns'
+import NotificationDetailModal from './NotificationDetailModal'
 
 interface NotificationListProps {
   environment: AppleEnvironment
@@ -15,6 +16,8 @@ export default function NotificationList({ environment }: NotificationListProps)
   const [filter, setFilter] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
+  const [selectedNotification, setSelectedNotification] = useState<any>(null)
+  const [showDetail, setShowDetail] = useState(false)
   const itemsPerPage = 20
 
   useEffect(() => {
@@ -45,7 +48,7 @@ export default function NotificationList({ environment }: NotificationListProps)
       .from('notifications_raw')
       .select('*')
       .eq('environment', environment === AppleEnvironment.SANDBOX ? 'Sandbox' : 'Production')
-      .order('received_at', { ascending: false })
+      .order('signed_date', { ascending: false, nullsFirst: false })
       .range(from, to)
     
     if (filter !== 'all') {
@@ -147,13 +150,20 @@ export default function NotificationList({ environment }: NotificationListProps)
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Received
+                  Signed Date
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {notifications.map((notification) => (
-                <tr key={notification.id} className="hover:bg-gray-50">
+                <tr 
+                  key={notification.id} 
+                  className="hover:bg-gray-50 cursor-pointer"
+                  onClick={() => {
+                    setSelectedNotification(notification)
+                    setShowDetail(true)
+                  }}
+                >
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     {notification.notification_type}
                   </td>
@@ -169,7 +179,10 @@ export default function NotificationList({ environment }: NotificationListProps)
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {format(new Date(notification.received_at), 'MMM dd, HH:mm')}
+                    {notification.signed_date 
+                      ? format(new Date(notification.signed_date), 'MMM dd, HH:mm')
+                      : format(new Date(notification.received_at), 'MMM dd, HH:mm')
+                    }
                   </td>
                 </tr>
               ))}
@@ -276,6 +289,16 @@ export default function NotificationList({ environment }: NotificationListProps)
           </div>
         </div>
       )}
+      
+      {/* Notification Detail Modal */}
+      <NotificationDetailModal
+        notification={selectedNotification}
+        isOpen={showDetail}
+        onClose={() => {
+          setShowDetail(false)
+          setSelectedNotification(null)
+        }}
+      />
     </div>
   )
 }
