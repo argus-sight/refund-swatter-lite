@@ -35,3 +35,12 @@ verify_jwt = false
 
 [functions.process-jobs]
 verify_jwt = false
+
+[functions.apple-notification-history]
+verify_jwt = false
+
+[functions.process-notifications]
+verify_jwt = false
+
+[functions.process-notifications-cron]
+verify_jwt = false
