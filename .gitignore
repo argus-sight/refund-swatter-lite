@@ -2,3 +2,6 @@
 .env.local
 .env.production
 web/.next/
+.mcp.json
+.claude
+CLAUDE.md

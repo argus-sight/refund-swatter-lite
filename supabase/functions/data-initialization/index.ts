@@ -80,7 +80,9 @@ async function storeNotifications(
       },
       environment: notification.environment,
       status: 'pending', // Will be processed later
-      received_at: new Date().toISOString()
+      received_at: new Date().toISOString(),
+      source: 'history_api', // Mark as coming from history API
+      signed_date: notification.signedDate ? new Date(notification.signedDate) : null
     }))
 
     // Insert with upsert to handle duplicates

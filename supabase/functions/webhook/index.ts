@@ -91,6 +91,9 @@ serve(async (req) => {
     const environment = payload.data?.environment || 'Production'
     console.log(`[${requestId}] Environment determined: ${environment}`)
     
+    // Extract signed date from payload
+    const signedDate = payload.signedDate ? new Date(payload.signedDate) : null
+    
     // Store raw notification
     console.log(`[${requestId}] Storing raw notification in database...`)
     const { data: notification, error: notificationError } = await supabase
@@ -102,7 +105,9 @@ serve(async (req) => {
         signed_payload: signedPayload,
         decoded_payload: payload,
         environment: environment,
-        status: 'pending'
+        status: 'pending',
+        source: 'webhook', // Mark as coming from webhook
+        signed_date: signedDate
       })
       .select()
       .single()
@@ -116,110 +121,25 @@ serve(async (req) => {
     console.log(`[${requestId}] ✓ Notification stored successfully`)
     console.log(`[${requestId}] Notification ID: ${notification.id}`)
 
-    // Process based on notification type
-    if (payload.notificationType === 'CONSUMPTION_REQUEST') {
-      console.log(`[${requestId}] >>> Processing CONSUMPTION_REQUEST`)
-      
-      const transactionInfo = payload.data?.transactionInfo || {}
-      const consumptionRequestReason = payload.data?.consumptionRequestReason
-      console.log(`[${requestId}] Original Transaction ID: ${transactionInfo.originalTransactionId}`)
-      console.log(`[${requestId}] Consumption Request Reason: ${consumptionRequestReason}`)
-      
-      // Create consumption request
-      const deadline = new Date()
-      deadline.setHours(deadline.getHours() + 12) // 12 hour deadline
-      
-      const { data: consumptionRequest, error: requestError } = await supabase
-        .from('consumption_requests')
-        .insert({
-          notification_id: notification.id,
-          original_transaction_id: transactionInfo.originalTransactionId,
-          consumption_request_reason: consumptionRequestReason,
-          request_date: new Date().toISOString(),
-          deadline: deadline.toISOString(),
-          status: 'pending'
-        })
-        .select()
-        .single()
-
-      if (requestError) {
-        console.error('Error creating consumption request:', requestError)
-        throw requestError
-      }
-
-      console.log('Consumption request created:', consumptionRequest.id)
-      
-      // Process the consumption request
-      const { error: processError } = await supabase
-        .rpc('process_consumption_request', {
-          p_request_id: consumptionRequest.id
-        })
-
-      if (processError) {
-        console.error('Error processing consumption request:', processError)
-      }
-    } else {
-      // Process other notification types (store transaction data, refunds, etc.)
-      const transactionInfo = payload.data?.transactionInfo || {}
-      
-      if (transactionInfo.transactionId) {
-        // Store or update transaction
-        const { error: transactionError } = await supabase
-          .from('transactions')
-          .upsert({
-            transaction_id: transactionInfo.transactionId,
-            original_transaction_id: transactionInfo.originalTransactionId,
-            product_id: transactionInfo.productId,
-            product_type: transactionInfo.type,
-            purchase_date: transactionInfo.purchaseDate ? new Date(transactionInfo.purchaseDate).toISOString() : null,
-            original_purchase_date: transactionInfo.originalPurchaseDate ? new Date(transactionInfo.originalPurchaseDate).toISOString() : null,
-            expiration_date: transactionInfo.expiresDate ? new Date(transactionInfo.expiresDate).toISOString() : null,
-            price: transactionInfo.price ? transactionInfo.price / 1000 : null, // Apple sends in milliunits
-            currency: transactionInfo.currency,
-            quantity: transactionInfo.quantity || 1,
-            app_account_token: transactionInfo.appAccountToken,
-            in_app_ownership_type: transactionInfo.inAppOwnershipType,
-            environment: environment
-          })
-
-        if (transactionError) {
-          console.error('Error storing transaction:', transactionError)
-        }
-      }
-      
-      // Handle refunds
-      if (payload.notificationType === 'REFUND' || payload.notificationType === 'REFUND_DECLINED') {
-        const { error: refundError } = await supabase
-          .from('refunds')
-          .insert({
-            transaction_id: transactionInfo.transactionId,
-            original_transaction_id: transactionInfo.originalTransactionId,
-            refund_date: new Date().toISOString(),
-            refund_amount: transactionInfo.price ? transactionInfo.price / 1000 : null,
-            refund_reason: transactionInfo.transactionReason || payload.notificationType
-          })
-
-        if (refundError) {
-          console.error('Error storing refund:', refundError)
-        }
-      }
-    }
-
-    // Update notification as processed
-    console.log(`[${requestId}] Updating notification status to processed...`)
-    const { error: updateError } = await supabase
-      .from('notifications_raw')
-      .update({
-        status: 'processed',
-        processed_at: new Date().toISOString()
-      })
-      .eq('id', notification.id)
+    // Trigger asynchronous processing of the notification
+    console.log(`[${requestId}] Triggering notification processing...`)
+    const processUrl = `${supabaseUrl}/functions/v1/process-notifications`
     
-    if (updateError) {
-      console.error(`[${requestId}] WARNING: Failed to update notification status:`, updateError)
-    } else {
-      console.log(`[${requestId}] ✓ Notification status updated to processed`)
-    }
+    // Fire and forget - don't wait for processing to complete
+    fetch(processUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        limit: 10  // Process up to 10 pending notifications
+      })
+    }).then(() => {
+      console.log(`[${requestId}] Notification processing triggered successfully`)
+    }).catch(error => {
+      console.error(`[${requestId}] Failed to trigger notification processing:`, error)
+    })
 
     const duration = Date.now() - startTime
     console.log(`[${requestId}] ==> Request completed successfully`)
