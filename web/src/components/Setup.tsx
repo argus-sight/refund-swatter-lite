@@ -31,6 +31,7 @@ export default function Setup({ onSetupComplete }: SetupProps) {
           apple_issuer_id: issuerId,
           apple_key_id: keyId,
           environment,
+          refund_preference: 0, // Default to undeclared
           updated_at: new Date().toISOString()
         })
         .eq('id', 1)

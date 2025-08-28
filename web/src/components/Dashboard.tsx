@@ -26,6 +26,7 @@ export default function Dashboard() {
   const [config, setConfig] = useState<any>(null)
   const [stats, setStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [savingRefundPreference, setSavingRefundPreference] = useState(false)
 
   useEffect(() => {
     loadConfig()
@@ -57,6 +58,46 @@ export default function Dashboard() {
     setEnvironment(newEnv)
     // Environment is now just a view-level filter
     // No need to save to database
+  }
+
+  const handleRefundPreferenceChange = async (value: number) => {
+    setSavingRefundPreference(true)
+    try {
+      console.log('Updating refund preference to:', value)
+      
+      const { data, error } = await supabase
+        .from('config')
+        .update({ 
+          refund_preference: value,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', 1)
+        .select()
+      
+      if (error) {
+        console.error('Supabase update error:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
+        throw error
+      }
+      
+      console.log('Update successful, returned data:', data)
+      
+      // Update local config
+      setConfig({ ...config, refund_preference: value })
+      
+      // Show success message
+      console.log('Refund preference updated successfully to:', value)
+    } catch (error: any) {
+      console.error('Failed to update refund preference - Full error:', error)
+      const errorMessage = error?.message || 'Failed to update refund preference'
+      alert(`Error: ${errorMessage}\n\nPlease check the browser console for details.`)
+    } finally {
+      setSavingRefundPreference(false)
+    }
   }
 
   const tabs = [
@@ -184,7 +225,48 @@ export default function Dashboard() {
         {activeTab === 'settings' && (
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-lg font-semibold mb-4">Settings</h2>
-            <div className="space-y-4">
+            <div className="space-y-6">
+              {/* Refund Preference Setting */}
+              <div className="border-b pb-6">
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Refund Preference</h3>
+                <p className="text-xs text-gray-500 mb-3">
+                  Configure your default preference for refund requests. This helps Apple's refund decision process.
+                </p>
+                <select
+                  value={config?.refund_preference || 0}
+                  onChange={(e) => handleRefundPreferenceChange(parseInt(e.target.value))}
+                  disabled={savingRefundPreference}
+                  className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                >
+                  <option value={0}>Undeclared (Don't provide preference)</option>
+                  <option value={1}>Prefer Grant Refund</option>
+                  <option value={2}>Prefer Decline Refund</option>
+                  <option value={3}>No Preference</option>
+                </select>
+                {savingRefundPreference && (
+                  <span className="ml-2 text-xs text-gray-500">Saving...</span>
+                )}
+                <div className="mt-2 p-3 bg-blue-50 rounded-md">
+                  <p className="text-xs text-blue-700">
+                    <strong>Note:</strong> This is just a preference and one of many factors Apple considers. 
+                    The actual refund decision is made by Apple based on multiple criteria.
+                  </p>
+                </div>
+              </div>
+
+              {/* Delivery Status Note */}
+              <div className="border-b pb-6">
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Delivery Status</h3>
+                <div className="p-3 bg-green-50 rounded-md">
+                  <p className="text-xs text-green-700">
+                    <strong>Default:</strong> All consumption requests report delivery status as "Successfully delivered and working properly" (status: 0).
+                  </p>
+                  <p className="text-xs text-green-700 mt-1">
+                    You are responsible for ensuring successful delivery of purchased items before the consumption data is sent to Apple.
+                  </p>
+                </div>
+              </div>
+
               <div>
                 <h3 className="text-sm font-medium text-gray-700 mb-2">Webhook URL</h3>
                 <div className="flex items-center space-x-2">

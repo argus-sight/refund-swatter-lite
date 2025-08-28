@@ -5,3 +5,10 @@ web/.next/
 .mcp.json
 .claude
 CLAUDE.md
+
+node_modules/
+.next/
+out/
+dist/
+.vercel/
+.DS_Store

@@ -4,6 +4,7 @@ CREATE EXTENSION IF NOT EXISTS "pg_cron";
 CREATE EXTENSION IF NOT EXISTS "vault";
 
 -- Config table (single row only for single tenant)
+-- Note: Webhook URL is fixed at {SUPABASE_URL}/functions/v1/webhook
 CREATE TABLE config (
     id INT PRIMARY KEY DEFAULT 1 CHECK (id = 1), -- Ensures single row
     bundle_id TEXT NOT NULL,
@@ -11,7 +12,7 @@ CREATE TABLE config (
     apple_key_id TEXT NOT NULL,
     apple_private_key_id UUID, -- Reference to vault secret
     environment TEXT DEFAULT 'sandbox' CHECK (environment IN ('sandbox', 'production')),
-    webhook_url TEXT,
+    refund_preference INTEGER DEFAULT 0 CHECK (refund_preference IN (0, 1, 2, 3)), -- 0=Undeclared, 1=Prefer grant, 2=Prefer decline, 3=No preference
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -194,6 +195,6 @@ END;
 $$;
 
 -- Insert default config row
-INSERT INTO config (bundle_id, apple_issuer_id, apple_key_id, environment)
-VALUES ('com.example.app', '', '', 'sandbox')
+INSERT INTO config (bundle_id, apple_issuer_id, apple_key_id, environment, refund_preference)
+VALUES ('com.example.app', '', '', 'sandbox', 0)
 ON CONFLICT (id) DO NOTHING;
