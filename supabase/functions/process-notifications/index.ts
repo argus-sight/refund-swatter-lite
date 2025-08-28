@@ -241,9 +241,11 @@ async function processRefund(supabase: any, notification: any, transactionInfo: 
 }
 
 async function processConsumptionRequest(supabase: any, notification: any, data: any, environment: string) {
+  const originalTransactionId = data.consumptionRequestReason?.originalTransactionId || data.originalTransactionId
+  
   const consumptionData = {
     notification_id: notification.id,
-    original_transaction_id: data.consumptionRequestReason?.originalTransactionId || data.originalTransactionId,
+    original_transaction_id: originalTransactionId,
     consumption_request_reason: data.consumptionRequestReason?.reason || null,
     request_date: new Date().toISOString(),
     deadline: data.consumptionRequestReason?.deadline ? 
@@ -251,6 +253,7 @@ async function processConsumptionRequest(supabase: any, notification: any, data:
       new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(), // Default 12 hours
     status: 'pending',
     environment: environment
+  }
 
   // Insert consumption request
   const { data: consumptionRequest, error: insertError } = await supabase
@@ -261,18 +264,73 @@ async function processConsumptionRequest(supabase: any, notification: any, data:
 
   if (insertError) throw new Error(`Failed to create consumption request: ${insertError.message}`)
 
-  // Create send job
+  // Calculate consumption data using the database function
+  const { data: calculatedData, error: calcError } = await supabase
+    .rpc('calculate_consumption_data', {
+      p_original_transaction_id: originalTransactionId
+    })
+
+  if (calcError) {
+    console.error('Failed to calculate consumption data:', calcError)
+    throw new Error(`Failed to calculate consumption data: ${calcError.message}`)
+  }
+
+  // Create send job with calculated data
   const jobData = {
     consumption_request_id: consumptionRequest.id,
+    consumption_data: calculatedData,
     status: 'pending',
     scheduled_at: new Date().toISOString()
   }
 
-  const { error: jobError } = await supabase
+  const { data: job, error: jobError } = await supabase
     .from('send_consumption_jobs')
     .insert(jobData)
+    .select()
+    .single()
 
   if (jobError) throw new Error(`Failed to create send job: ${jobError.message}`)
+
+  // Immediately send consumption data to Apple
+  try {
+    console.log('Immediately sending consumption data to Apple...')
+    
+    // Call send-consumption Edge Function directly
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    
+    const sendResponse = await fetch(`${supabaseUrl}/functions/v1/send-consumption`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        jobId: job.id, // Send specific job ID to process
+        immediate: true // Flag to indicate immediate processing
+      })
+    })
+
+    if (sendResponse.ok) {
+      const result = await sendResponse.json()
+      console.log('✓ Consumption data sent immediately:', result)
+      
+      // Update request status to sent if successful
+      await supabase
+        .from('consumption_requests')
+        .update({
+          status: 'sent',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', consumptionRequest.id)
+    } else {
+      console.error('Failed to send consumption data immediately:', await sendResponse.text())
+      // Job remains pending and will be processed by scheduled task
+    }
+  } catch (error) {
+    console.error('Error sending consumption data immediately:', error)
+    // Job remains pending and will be processed by scheduled task
+  }
 }
 
 async function processSubscribed(supabase: any, notification: any, transactionInfo: any, subtype: string, environment: string) {

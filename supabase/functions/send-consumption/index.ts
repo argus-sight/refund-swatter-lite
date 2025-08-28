@@ -158,22 +158,63 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     console.log(`[${requestId}] Supabase client initialized`)
 
-    // Get pending consumption jobs with environment information
-    console.log(`[${requestId}] Fetching pending consumption jobs...`)
-    const { data: jobs, error: jobsError } = await supabase
-      .from('send_consumption_jobs')
-      .select(`
-        *,
-        consumption_requests!inner(
-          original_transaction_id,
-          deadline,
-          environment
-        )
-      `)
-      .eq('status', 'pending')
-      .lte('scheduled_at', new Date().toISOString())
-      .order('created_at', { ascending: true })
-      .limit(10)
+    // Check if request body contains a specific jobId for immediate processing
+    let jobId: string | null = null
+    let immediate = false
+    
+    if (req.method === 'POST') {
+      try {
+        const body = await req.json()
+        jobId = body.jobId || null
+        immediate = body.immediate || false
+        console.log(`[${requestId}] Request body - jobId: ${jobId}, immediate: ${immediate}`)
+      } catch (e) {
+        console.log(`[${requestId}] No valid JSON body provided`)
+      }
+    }
+
+    let jobs
+    let jobsError
+
+    if (jobId) {
+      // Process specific job immediately
+      console.log(`[${requestId}] Fetching specific job: ${jobId}`)
+      const result = await supabase
+        .from('send_consumption_jobs')
+        .select(`
+          *,
+          consumption_requests!inner(
+            original_transaction_id,
+            deadline,
+            environment
+          )
+        `)
+        .eq('id', jobId)
+        .single()
+      
+      jobs = result.data ? [result.data] : []
+      jobsError = result.error
+    } else {
+      // Get pending consumption jobs with environment information
+      console.log(`[${requestId}] Fetching pending consumption jobs...`)
+      const result = await supabase
+        .from('send_consumption_jobs')
+        .select(`
+          *,
+          consumption_requests!inner(
+            original_transaction_id,
+            deadline,
+            environment
+          )
+        `)
+        .eq('status', 'pending')
+        .lte('scheduled_at', new Date().toISOString())
+        .order('created_at', { ascending: true })
+        .limit(10)
+      
+      jobs = result.data
+      jobsError = result.error
+    }
 
     if (jobsError) {
       console.error(`[${requestId}] ERROR fetching jobs:`, jobsError)
