@@ -48,22 +48,46 @@ export default function ConsumptionMetrics({ stats }: ConsumptionMetricsProps) {
   ]
 
   return (
-    <div className="bg-white rounded-lg shadow">
-      <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
-        <h3 className="text-lg leading-6 font-medium text-gray-900">
-          Consumption Metrics (Last 30 Days)
-        </h3>
+    <div className="space-y-4">
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
+          <h3 className="text-lg leading-6 font-medium text-gray-900">
+            Consumption Metrics (Last 30 Days)
+          </h3>
+        </div>
+        <div className="p-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {metrics.map((metric, index) => (
+              <div key={index} className="bg-gray-50 rounded-lg p-4">
+                <p className="text-sm text-gray-600">{metric.label}</p>
+                <p className={`text-2xl font-semibold mt-1 ${metric.color}`}>
+                  {metric.value}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
-      <div className="p-6">
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {metrics.map((metric, index) => (
-            <div key={index} className="bg-gray-50 rounded-lg p-4">
-              <p className="text-sm text-gray-600">{metric.label}</p>
-              <p className={`text-2xl font-semibold mt-1 ${metric.color}`}>
-                {metric.value}
-              </p>
-            </div>
-          ))}
+
+      {/* Important Notice about Consumption Data */}
+      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+        <h3 className="text-sm font-semibold text-amber-900 mb-2">⚠️ Important: Consumption Data Defaults</h3>
+        <div className="text-xs text-amber-800 space-y-1">
+          <p>
+            <strong>Consumption Status:</strong> Defaults to 0 (Undeclared) when usage data is not available. 
+            Apple notifications don't track content consumption - you need to implement this in your app.
+          </p>
+          <p>
+            <strong>User Status:</strong> Defaults to 0 (Undeclared) or 1 (Active). 
+            To report suspended/terminated accounts, implement account management in your app.
+          </p>
+          <p>
+            <strong>Delivery Status:</strong> Always reports 0 (Successfully delivered). 
+            Ensure successful delivery before sending consumption data.
+          </p>
+          <p className="pt-2 text-amber-900">
+            See Settings tab for detailed information about each field.
+          </p>
         </div>
       </div>
     </div>

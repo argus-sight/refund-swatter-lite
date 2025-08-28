@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
 import { AppleEnvironment } from '@/lib/apple'
 import NotificationList from './NotificationList'
 import ConsumptionMetrics from './ConsumptionMetrics'
@@ -34,24 +33,34 @@ export default function Dashboard() {
   }, [])
 
   const loadConfig = async () => {
-    const { data } = await supabase
-      .from('config')
-      .select('*')
-      .single()
-    
-    if (data) {
-      setConfig(data)
-      // environment is no longer stored in config table
-      // it's now a view-level filter for displaying data
+    try {
+      const response = await fetch('/api/config')
+      if (response.ok) {
+        const data = await response.json()
+        if (data) {
+          setConfig(data)
+        }
+      } else {
+        console.error('Failed to load config')
+      }
+    } catch (error) {
+      console.error('Error loading config:', error)
     }
     setLoading(false)
   }
 
   const loadStats = async () => {
-    const { data } = await supabase
-      .rpc('get_consumption_metrics_summary')
-    
-    setStats(data)
+    try {
+      const response = await fetch('/api/consumption-metrics')
+      if (response.ok) {
+        const data = await response.json()
+        setStats(data)
+      } else {
+        console.error('Failed to load stats')
+      }
+    } catch (error) {
+      console.error('Error loading stats:', error)
+    }
   }
 
   const handleEnvironmentChange = (newEnv: AppleEnvironment) => {
@@ -65,25 +74,23 @@ export default function Dashboard() {
     try {
       console.log('Updating refund preference to:', value)
       
-      const { data, error } = await supabase
-        .from('config')
-        .update({ 
+      const response = await fetch('/api/config', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
           refund_preference: value,
           updated_at: new Date().toISOString()
         })
-        .eq('id', 1)
-        .select()
+      })
       
-      if (error) {
-        console.error('Supabase update error:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        })
-        throw error
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to update config')
       }
       
+      const data = await response.json()
       console.log('Update successful, returned data:', data)
       
       // Update local config
@@ -263,6 +270,38 @@ export default function Dashboard() {
                   </p>
                   <p className="text-xs text-green-700 mt-1">
                     You are responsible for ensuring successful delivery of purchased items before the consumption data is sent to Apple.
+                  </p>
+                </div>
+              </div>
+
+              {/* Consumption Status Note */}
+              <div className="border-b pb-6">
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Consumption Status</h3>
+                <div className="p-3 bg-yellow-50 rounded-md">
+                  <p className="text-xs text-yellow-700">
+                    <strong>Default:</strong> Returns "Undeclared" (status: 0) when consumption data cannot be determined.
+                  </p>
+                  <p className="text-xs text-yellow-700 mt-1">
+                    <strong>Current Logic:</strong> Simplified implementation - returns 0 (undeclared), 1 (not consumed for active subscriptions), or 2 (partially consumed if content accessed).
+                  </p>
+                  <p className="text-xs text-yellow-700 mt-1">
+                    <strong>Note:</strong> Apple does not provide consumption tracking via notifications. To accurately track consumption, you need to implement usage tracking in your app and store it in the usage_metrics table.
+                  </p>
+                </div>
+              </div>
+
+              {/* User Status Note */}
+              <div className="border-b pb-6">
+                <h3 className="text-sm font-medium text-gray-700 mb-2">User Status</h3>
+                <div className="p-3 bg-yellow-50 rounded-md">
+                  <p className="text-xs text-yellow-700">
+                    <strong>Default:</strong> Returns "Undeclared" (status: 0) for users without purchases, or "Active" (status: 1) for users with purchases.
+                  </p>
+                  <p className="text-xs text-yellow-700 mt-1">
+                    <strong>Apple Values:</strong> 0=Undeclared, 1=Active, 2=Suspended, 3=Terminated, 4=Limited Access
+                  </p>
+                  <p className="text-xs text-yellow-700 mt-1">
+                    <strong>Note:</strong> To properly track user account status (suspended/terminated/limited), you need to implement an account management system in your app.
                   </p>
                 </div>
               </div>

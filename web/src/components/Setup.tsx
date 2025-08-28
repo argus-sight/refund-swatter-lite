@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { supabase } from '@/lib/supabase'
 import { AppleEnvironment } from '@/lib/apple'
 
 interface SetupProps {
@@ -23,10 +22,13 @@ export default function Setup({ onSetupComplete }: SetupProps) {
     setError('')
 
     try {
-      // Update config
-      const { error: configError } = await supabase
-        .from('config')
-        .update({
+      // Update config via API
+      const configResponse = await fetch('/api/config', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
           bundle_id: bundleId,
           apple_issuer_id: issuerId,
           apple_key_id: keyId,
@@ -34,10 +36,11 @@ export default function Setup({ onSetupComplete }: SetupProps) {
           refund_preference: 0, // Default to undeclared
           updated_at: new Date().toISOString()
         })
-        .eq('id', 1)
+      })
 
-      if (configError) {
-        throw configError
+      if (!configResponse.ok) {
+        const errorData = await configResponse.json()
+        throw new Error(errorData.error || 'Failed to update config')
       }
 
       // Store private key in vault
