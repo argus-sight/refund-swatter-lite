@@ -158,20 +158,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     console.log(`[${requestId}] Supabase client initialized`)
 
-    // Get config
-    console.log(`[${requestId}] Fetching configuration...`)
-    const { data: config, error: configError } = await supabase
-      .from('config')
-      .select('environment')
-      .single()
-
-    if (configError || !config) {
-      console.error(`[${requestId}] ERROR: Configuration not found`, configError)
-      throw new Error('Configuration not found')
-    }
-    console.log(`[${requestId}] Configuration loaded - Environment: ${config.environment}`)
-
-    // Get pending consumption jobs
+    // Get pending consumption jobs with environment information
     console.log(`[${requestId}] Fetching pending consumption jobs...`)
     const { data: jobs, error: jobsError } = await supabase
       .from('send_consumption_jobs')
@@ -179,7 +166,8 @@ serve(async (req) => {
         *,
         consumption_requests!inner(
           original_transaction_id,
-          deadline
+          deadline,
+          environment
         )
       `)
       .eq('status', 'pending')
@@ -227,12 +215,15 @@ serve(async (req) => {
         })
         .eq('id', job.id)
 
-      // Send consumption data to Apple
+      // Send consumption data to Apple using the environment from consumption_request
+      const environment = job.consumption_requests.environment || 'production'  // Default to production if not set
+      console.log(`[${requestId}] Using environment: ${environment} for job ${job.id}`)
+      
       const result = await sendConsumptionToApple(
         jwt,
         job.consumption_requests.original_transaction_id,
         job.consumption_data,
-        config.environment,
+        environment,
         supabase,
         job.consumption_request_id,
         requestId

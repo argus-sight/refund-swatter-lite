@@ -130,7 +130,7 @@ serve(async (req) => {
 })
 
 async function processNotification(supabase: any, notification: any) {
-  const { notification_type, subtype, decoded_payload } = notification
+  const { notification_type, subtype, decoded_payload, environment } = notification
   
   // Extract common transaction info if available
   const transactionInfo = decoded_payload?.data?.signedTransactionInfo
@@ -138,32 +138,32 @@ async function processNotification(supabase: any, notification: any) {
   switch (notification_type) {
     // ===== Core Types (Priority 1) =====
     case 'REFUND':
-      await processRefund(supabase, notification, transactionInfo)
+      await processRefund(supabase, notification, transactionInfo, environment)
       break
 
     case 'CONSUMPTION_REQUEST':
-      await processConsumptionRequest(supabase, notification, decoded_payload.data)
+      await processConsumptionRequest(supabase, notification, decoded_payload.data, environment)
       break
 
     case 'SUBSCRIBED':
-      await processSubscribed(supabase, notification, transactionInfo, subtype)
+      await processSubscribed(supabase, notification, transactionInfo, subtype, environment)
       break
 
     case 'DID_RENEW':
-      await processRenewal(supabase, notification, transactionInfo, subtype)
+      await processRenewal(supabase, notification, transactionInfo, subtype, environment)
       break
 
     case 'ONE_TIME_CHARGE':
-      await processOneTimeCharge(supabase, notification, transactionInfo)
+      await processOneTimeCharge(supabase, notification, transactionInfo, environment)
       break
 
     // ===== Subscription Status Changes (Priority 1) =====
     case 'DID_CHANGE_RENEWAL_STATUS':
-      await processRenewalStatusChange(supabase, notification, transactionInfo, subtype)
+      await processRenewalStatusChange(supabase, notification, transactionInfo, subtype, environment)
       break
 
     case 'EXPIRED':
-      await processExpired(supabase, notification, transactionInfo, subtype)
+      await processExpired(supabase, notification, transactionInfo, subtype, environment)
       break
 
     // ===== Billing Issues (Priority 2) =====
@@ -191,7 +191,7 @@ async function processNotification(supabase: any, notification: any) {
 
     // ===== Marketing (Priority 3) =====
     case 'OFFER_REDEEMED':
-      await processOfferRedeemed(supabase, notification, transactionInfo, subtype)
+      await processOfferRedeemed(supabase, notification, transactionInfo, subtype, environment)
       break
 
     case 'PRICE_INCREASE':
@@ -214,7 +214,7 @@ async function processNotification(supabase: any, notification: any) {
 
 // ===== Processing Functions =====
 
-async function processRefund(supabase: any, notification: any, transactionInfo: any) {
+async function processRefund(supabase: any, notification: any, transactionInfo: any, environment: string) {
   if (!transactionInfo) return
 
   // For refunds, use originalTransactionId if available, otherwise use transactionId
@@ -227,8 +227,8 @@ async function processRefund(supabase: any, notification: any, transactionInfo: 
       new Date(transactionInfo.revocationDate).toISOString() : 
       new Date().toISOString(),
     refund_amount: transactionInfo.price ? transactionInfo.price / 1000 : null,
-    refund_reason: transactionInfo.revocationReason || null
-  }
+    refund_reason: transactionInfo.revocationReason || null,
+    environment: environment
 
   const { error } = await supabase
     .from('refunds')
@@ -240,7 +240,7 @@ async function processRefund(supabase: any, notification: any, transactionInfo: 
   if (error) throw new Error(`Failed to process refund: ${error.message}`)
 }
 
-async function processConsumptionRequest(supabase: any, notification: any, data: any) {
+async function processConsumptionRequest(supabase: any, notification: any, data: any, environment: string) {
   const consumptionData = {
     notification_id: notification.id,
     original_transaction_id: data.consumptionRequestReason?.originalTransactionId || data.originalTransactionId,
@@ -249,8 +249,8 @@ async function processConsumptionRequest(supabase: any, notification: any, data:
     deadline: data.consumptionRequestReason?.deadline ? 
       new Date(data.consumptionRequestReason.deadline).toISOString() : 
       new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(), // Default 12 hours
-    status: 'pending'
-  }
+    status: 'pending',
+    environment: environment
 
   // Insert consumption request
   const { data: consumptionRequest, error: insertError } = await supabase
@@ -275,7 +275,7 @@ async function processConsumptionRequest(supabase: any, notification: any, data:
   if (jobError) throw new Error(`Failed to create send job: ${jobError.message}`)
 }
 
-async function processSubscribed(supabase: any, notification: any, transactionInfo: any, subtype: string) {
+async function processSubscribed(supabase: any, notification: any, transactionInfo: any, subtype: string, environment: string) {
   if (!transactionInfo) return
 
   // For initial subscriptions, originalTransactionId might be null or same as transactionId
@@ -295,7 +295,7 @@ async function processSubscribed(supabase: any, notification: any, transactionIn
     price: transactionInfo.price ? transactionInfo.price / 1000 : null,
     currency: transactionInfo.currency,
     app_account_token: transactionInfo.appAccountToken,
-    environment: transactionInfo.environment
+    environment: environment  // Use environment from notification, not from transactionInfo
   }
 
   const { error } = await supabase
@@ -307,17 +307,17 @@ async function processSubscribed(supabase: any, notification: any, transactionIn
   if (error) throw new Error(`Failed to process subscription: ${error.message}`)
 }
 
-async function processRenewal(supabase: any, notification: any, transactionInfo: any, subtype: string) {
+async function processRenewal(supabase: any, notification: any, transactionInfo: any, subtype: string, environment: string) {
   // Same as processSubscribed for renewals
-  await processSubscribed(supabase, notification, transactionInfo, subtype)
+  await processSubscribed(supabase, notification, transactionInfo, subtype, environment)
 }
 
-async function processOneTimeCharge(supabase: any, notification: any, transactionInfo: any) {
+async function processOneTimeCharge(supabase: any, notification: any, transactionInfo: any, environment: string) {
   // Same as processSubscribed for one-time purchases
-  await processSubscribed(supabase, notification, transactionInfo, null)
+  await processSubscribed(supabase, notification, transactionInfo, null, environment)
 }
 
-async function processRenewalStatusChange(supabase: any, notification: any, transactionInfo: any, subtype: string) {
+async function processRenewalStatusChange(supabase: any, notification: any, transactionInfo: any, subtype: string, environment: string) {
   if (!transactionInfo) return
 
   const originalTransactionId = transactionInfo.originalTransactionId || transactionInfo.transactionId
@@ -338,7 +338,7 @@ async function processRenewalStatusChange(supabase: any, notification: any, tran
   if (error) throw new Error(`Failed to update renewal status: ${error.message}`)
 }
 
-async function processExpired(supabase: any, notification: any, transactionInfo: any, subtype: string) {
+async function processExpired(supabase: any, notification: any, transactionInfo: any, subtype: string, environment: string) {
   if (!transactionInfo) return
 
   const originalTransactionId = transactionInfo.originalTransactionId || transactionInfo.transactionId
@@ -389,9 +389,9 @@ async function processRenewalPrefChange(supabase: any, notification: any, transa
   console.log(`Renewal preference changed: ${subtype} for transaction: ${transactionInfo?.originalTransactionId}`)
 }
 
-async function processOfferRedeemed(supabase: any, notification: any, transactionInfo: any, subtype: string) {
+async function processOfferRedeemed(supabase: any, notification: any, transactionInfo: any, subtype: string, environment: string) {
   // Process offer redemption
-  await processSubscribed(supabase, notification, transactionInfo, subtype)
+  await processSubscribed(supabase, notification, transactionInfo, subtype, environment)
 }
 
 async function processPriceIncrease(supabase: any, notification: any, transactionInfo: any, subtype: string) {
