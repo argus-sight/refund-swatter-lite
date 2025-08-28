@@ -125,7 +125,11 @@ export default function TransactionHistory({ environment }: TransactionHistoryPr
                         </div>
                         <div>
                           <span className="text-gray-600">Purchase Date:</span>
-                          <p className="text-xs">{new Date(tx.purchaseDate * 1000).toLocaleDateString()}</p>
+                          <p className="text-xs">{new Date(tx.purchaseDate).toLocaleDateString('en-US', { 
+                            year: 'numeric', 
+                            month: '2-digit', 
+                            day: '2-digit' 
+                          })}</p>
                         </div>
                         <div>
                           <span className="text-gray-600">Price:</span>
@@ -134,7 +138,11 @@ export default function TransactionHistory({ environment }: TransactionHistoryPr
                         {tx.expiresDate && (
                           <div className="col-span-2">
                             <span className="text-gray-600">Expires:</span>
-                            <p className="text-xs">{new Date(tx.expiresDate * 1000).toLocaleDateString()}</p>
+                            <p className="text-xs">{new Date(tx.expiresDate).toLocaleDateString('en-US', { 
+                              year: 'numeric', 
+                              month: '2-digit', 
+                              day: '2-digit' 
+                            })}</p>
                           </div>
                         )}
                       </div>
