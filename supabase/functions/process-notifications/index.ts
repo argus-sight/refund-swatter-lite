@@ -217,9 +217,12 @@ async function processNotification(supabase: any, notification: any) {
 async function processRefund(supabase: any, notification: any, transactionInfo: any) {
   if (!transactionInfo) return
 
+  // For refunds, use originalTransactionId if available, otherwise use transactionId
+  const originalTransactionId = transactionInfo.originalTransactionId || transactionInfo.transactionId
+
   const refundData = {
     transaction_id: transactionInfo.transactionId,
-    original_transaction_id: transactionInfo.originalTransactionId,
+    original_transaction_id: originalTransactionId,
     refund_date: transactionInfo.revocationDate ? 
       new Date(transactionInfo.revocationDate).toISOString() : 
       new Date().toISOString(),
@@ -275,9 +278,12 @@ async function processConsumptionRequest(supabase: any, notification: any, data:
 async function processSubscribed(supabase: any, notification: any, transactionInfo: any, subtype: string) {
   if (!transactionInfo) return
 
+  // For initial subscriptions, originalTransactionId might be null or same as transactionId
+  const originalTransactionId = transactionInfo.originalTransactionId || transactionInfo.transactionId
+
   const transactionData = {
     transaction_id: transactionInfo.transactionId,
-    original_transaction_id: transactionInfo.originalTransactionId,
+    original_transaction_id: originalTransactionId,
     product_id: transactionInfo.productId,
     product_type: transactionInfo.type,
     purchase_date: transactionInfo.purchaseDate ? 
@@ -314,6 +320,8 @@ async function processOneTimeCharge(supabase: any, notification: any, transactio
 async function processRenewalStatusChange(supabase: any, notification: any, transactionInfo: any, subtype: string) {
   if (!transactionInfo) return
 
+  const originalTransactionId = transactionInfo.originalTransactionId || transactionInfo.transactionId
+
   // Update transaction with renewal status
   const updateData: any = {
     updated_at: new Date().toISOString()
@@ -325,13 +333,15 @@ async function processRenewalStatusChange(supabase: any, notification: any, tran
   const { error } = await supabase
     .from('transactions')
     .update(updateData)
-    .eq('original_transaction_id', transactionInfo.originalTransactionId)
+    .eq('original_transaction_id', originalTransactionId)
 
   if (error) throw new Error(`Failed to update renewal status: ${error.message}`)
 }
 
 async function processExpired(supabase: any, notification: any, transactionInfo: any, subtype: string) {
   if (!transactionInfo) return
+
+  const originalTransactionId = transactionInfo.originalTransactionId || transactionInfo.transactionId
 
   // Update transaction expiration
   const { error } = await supabase
@@ -340,7 +350,7 @@ async function processExpired(supabase: any, notification: any, transactionInfo:
       expiration_date: new Date().toISOString(),
       updated_at: new Date().toISOString()
     })
-    .eq('original_transaction_id', transactionInfo.originalTransactionId)
+    .eq('original_transaction_id', originalTransactionId)
 
   if (error) throw new Error(`Failed to process expiration: ${error.message}`)
 }
