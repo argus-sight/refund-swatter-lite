@@ -40,7 +40,8 @@ export default function Dashboard() {
     
     if (data) {
       setConfig(data)
-      setEnvironment(data.environment as AppleEnvironment)
+      // environment is no longer stored in config table
+      // it's now a view-level filter for displaying data
     }
     setLoading(false)
   }
@@ -52,17 +53,10 @@ export default function Dashboard() {
     setStats(data)
   }
 
-  const handleEnvironmentChange = async (newEnv: AppleEnvironment) => {
+  const handleEnvironmentChange = (newEnv: AppleEnvironment) => {
     setEnvironment(newEnv)
-    
-    const { error } = await supabase
-      .from('config')
-      .update({ environment: newEnv })
-      .eq('id', 1)
-    
-    if (!error) {
-      await loadConfig()
-    }
+    // Environment is now just a view-level filter
+    // No need to save to database
   }
 
   const tabs = [
@@ -158,10 +152,6 @@ export default function Dashboard() {
                   <span className="text-sm text-green-600">
                     {config?.apple_private_key ? 'Configured' : 'Not configured'}
                   </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Environment:</span>
-                  <span className="text-sm font-semibold">{config?.environment}</span>
                 </div>
               </div>
             </div>
