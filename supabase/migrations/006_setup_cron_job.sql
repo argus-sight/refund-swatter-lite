@@ -5,23 +5,9 @@ CREATE EXTENSION IF NOT EXISTS pg_cron;
 GRANT USAGE ON SCHEMA cron TO postgres;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA cron TO postgres;
 
--- Create a cron job to process pending notifications every 5 minutes
--- This calls the process-notifications-cron Edge Function
-SELECT cron.schedule(
-    'process-pending-notifications', -- Job name
-    '*/5 * * * *', -- Every 5 minutes
-    $$
-    SELECT
-        net.http_post(
-            url := current_setting('app.settings.supabase_url') || '/functions/v1/process-notifications-cron',
-            headers := jsonb_build_object(
-                'Content-Type', 'application/json',
-                'Authorization', 'Bearer ' || current_setting('app.settings.supabase_service_role_key')
-            ),
-            body := jsonb_build_object('trigger', 'cron')
-        ) AS request_id;
-    $$
-);
+-- Note: The cron job will be created by setup.sh with actual environment values
+-- This is a placeholder to show the structure
+-- DO NOT run this migration directly, it will be handled by the setup script
 
 -- Optional: Add a comment to document the job
 COMMENT ON EXTENSION pg_cron IS 'Job scheduler for PostgreSQL';
