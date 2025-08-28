@@ -21,6 +21,9 @@ async function getAppleJWT(supabase: any, requestId: string): Promise<string> {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     
+    console.log(`[${requestId}] Calling apple-jwt function at: ${supabaseUrl}/functions/v1/apple-jwt`)
+    const jwtStartTime = Date.now()
+    
     const response = await fetch(`${supabaseUrl}/functions/v1/apple-jwt`, {
       method: 'POST',
       headers: {
@@ -29,14 +32,19 @@ async function getAppleJWT(supabase: any, requestId: string): Promise<string> {
       }
     })
     
+    const jwtDuration = Date.now() - jwtStartTime
+    console.log(`[${requestId}] JWT generation response status: ${response.status} (took ${jwtDuration}ms)`)
+    
     if (!response.ok) {
       const errorData = await response.json()
-      console.error(`[${requestId}] Failed to generate JWT:`, errorData)
+      console.error(`[${requestId}] ❌ Failed to generate JWT:`, errorData)
       throw new Error(errorData.error || 'Failed to generate JWT')
     }
 
     const data = await response.json()
     console.log(`[${requestId}] ✓ Apple JWT obtained successfully`)
+    console.log(`[${requestId}] JWT length: ${data.jwt?.length || 0} characters`)
+    console.log(`[${requestId}] JWT preview: ${data.jwt?.substring(0, 50)}...`)
     return data.jwt
   } catch (error) {
     console.error(`[${requestId}] ERROR getting Apple JWT:`, error)
@@ -80,6 +88,7 @@ async function fetchNotificationHistoryPage(
 
   try {
     // Log API call to database (with full URL including query params)
+    console.log(`[${requestId}] Attempting to log API call to database...`)
     const { data: logData, error: logError } = await supabase
       .from('apple_api_logs')
       .insert({
@@ -96,9 +105,14 @@ async function fetchNotificationHistoryPage(
       .select('id')
       .single()
     
-    if (!logError && logData) {
+    if (logError) {
+      console.error(`[${requestId}] ⚠️ Failed to create database log:`, logError)
+      console.error(`[${requestId}] Error details:`, JSON.stringify(logError, null, 2))
+    } else if (logData) {
       logId = logData.id
-      console.log(`[${requestId}] Database log ID: ${logId}`)
+      console.log(`[${requestId}] ✓ Database log created with ID: ${logId}`)
+    } else {
+      console.warn(`[${requestId}] ⚠️ No error but also no log ID returned`)
     }
 
     // Make API request
@@ -138,7 +152,8 @@ async function fetchNotificationHistoryPage(
 
     // Update database log with response
     if (logId) {
-      await supabase
+      console.log(`[${requestId}] Updating database log ${logId} with response...`)
+      const { error: updateError } = await supabase
         .from('apple_api_logs')
         .update({
           response_status: response.status,
@@ -147,6 +162,14 @@ async function fetchNotificationHistoryPage(
           duration_ms: duration
         })
         .eq('id', logId)
+      
+      if (updateError) {
+        console.error(`[${requestId}] ⚠️ Failed to update database log:`, updateError)
+      } else {
+        console.log(`[${requestId}] ✓ Database log updated with response`)
+      }
+    } else {
+      console.warn(`[${requestId}] ⚠️ No log ID available, skipping response logging`)
     }
 
     if (!response.ok) {
@@ -271,6 +294,18 @@ async function fetchAllNotificationHistory(
   console.log(`[${requestId}] ✓ Finished fetching notification history`)
   console.log(`[${requestId}] - Total pages fetched: ${pageNumber - 1}`)
   console.log(`[${requestId}] - Total notifications: ${allNotifications.length}`)
+  
+  // Check how many API logs were created
+  console.log(`[${requestId}] Checking database logs...`)
+  const { data: logCount, error: logCountError } = await supabase
+    .from('apple_api_logs')
+    .select('id', { count: 'exact', head: true })
+    .like('notes', `%Request ID: ${requestId}%`)
+  
+  if (!logCountError) {
+    console.log(`[${requestId}] - Database logs created for this request: ${logCount || 0}`)
+  }
+  
   console.log(`[${requestId}] ============================================================`)
 
   return allNotifications
