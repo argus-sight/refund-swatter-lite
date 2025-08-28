@@ -84,16 +84,21 @@ BEGIN
     ) INTO v_content_accessed;
     
     -- Calculate consumption_status
-    -- 0 = accessed, 1 = active subscription, 2 = not accessed
+    -- 0 = undeclared, 1 = not consumed, 2 = partially consumed, 3 = fully consumed
+    -- For now, use simplified logic (to be improved with actual consumption tracking)
     IF v_content_accessed THEN
-        v_consumption_status := 0;
+        v_consumption_status := 2; -- Partially consumed (simplified)
     ELSIF v_has_active_subscription THEN
-        v_consumption_status := 1;
+        v_consumption_status := 1; -- Not consumed
     ELSE
-        v_consumption_status := 2;
+        v_consumption_status := 0; -- Undeclared
     END IF;
     
-    -- Calculate delivery_status (0-5 based on usage)
+    -- Set delivery_status to 0 (successfully delivered and working properly)
+    -- Developers are responsible for ensuring successful delivery before sending consumption info
+    v_delivery_status := 0;
+    
+    -- Calculate play time from usage metrics
     SELECT COALESCE(
         (metric_value->>'total_minutes')::INTEGER / 60, -- Convert minutes to hours
         0
@@ -104,48 +109,26 @@ BEGIN
     ORDER BY created_at DESC
     LIMIT 1;
     
-    -- Set delivery_status based on play time
-    IF v_play_time = 0 THEN
-        v_delivery_status := 5; -- Not delivered
-    ELSIF v_play_time < 1 THEN
-        v_delivery_status := 4; -- Minimal delivery
-    ELSIF v_play_time < 5 THEN
-        v_delivery_status := 3; -- Partial delivery
-    ELSIF v_play_time < 20 THEN
-        v_delivery_status := 2; -- Substantial delivery
-    ELSIF v_play_time < 50 THEN
-        v_delivery_status := 1; -- Near complete
-    ELSE
-        v_delivery_status := 0; -- Fully delivered
-    END IF;
-    
     -- Platform (always 1 for Apple)
     v_platform := 1;
     
-    -- Calculate refund_preference based on refund rate
-    IF v_transaction_count = 0 THEN
-        v_refund_preference := 2; -- No preference
-    ELSIF v_refund_count::FLOAT / v_transaction_count > 0.5 THEN
-        v_refund_preference := 0; -- High refund rate
-    ELSIF v_refund_count::FLOAT / v_transaction_count > 0.2 THEN
-        v_refund_preference := 1; -- Medium refund rate
-    ELSE
-        v_refund_preference := 2; -- Low refund rate
-    END IF;
+    -- Get refund_preference from config table
+    SELECT refund_preference INTO v_refund_preference
+    FROM config
+    WHERE id = 1;
     
-    -- Calculate user_status
+    -- If not configured, default to 0 (undeclared)
+    v_refund_preference := COALESCE(v_refund_preference, 0);
+    
+    -- Calculate user_status (Apple definition)
+    -- 0 = undeclared, 1 = active, 2 = suspended, 3 = terminated, 4 = limited access
+    -- Using simplified logic - in production should track actual account status
     IF v_lifetime_dollars_purchased = 0 THEN
-        v_user_status := 4; -- Never purchased
-    ELSIF v_lifetime_dollars_refunded::FLOAT / v_lifetime_dollars_purchased > 0.8 THEN
-        v_user_status := 0; -- Problematic
-    ELSIF v_lifetime_dollars_refunded::FLOAT / v_lifetime_dollars_purchased > 0.5 THEN
-        v_user_status := 1; -- High risk
-    ELSIF v_lifetime_dollars_refunded::FLOAT / v_lifetime_dollars_purchased > 0.2 THEN
-        v_user_status := 2; -- Medium risk
+        v_user_status := 0; -- Undeclared (no purchase history)
     ELSIF v_has_active_subscription THEN
-        v_user_status := 4; -- Active subscriber
+        v_user_status := 1; -- Active (has active subscription)
     ELSE
-        v_user_status := 3; -- Good standing
+        v_user_status := 1; -- Default to active (simplified implementation)
     END IF;
     
     -- Build the consumption data JSON
