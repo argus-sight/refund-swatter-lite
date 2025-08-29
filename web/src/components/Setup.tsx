@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { AppleEnvironment } from '@/lib/apple'
 
 interface SetupProps {
   onSetupComplete: () => void
@@ -12,7 +11,6 @@ export default function Setup({ onSetupComplete }: SetupProps) {
   const [issuerId, setIssuerId] = useState('')
   const [keyId, setKeyId] = useState('')
   const [privateKey, setPrivateKey] = useState('')
-  const [environment, setEnvironment] = useState<AppleEnvironment>(AppleEnvironment.SANDBOX)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -32,7 +30,6 @@ export default function Setup({ onSetupComplete }: SetupProps) {
           bundle_id: bundleId,
           apple_issuer_id: issuerId,
           apple_key_id: keyId,
-          environment,
           refund_preference: 0, // Default to undeclared
           updated_at: new Date().toISOString()
         })
@@ -149,21 +146,6 @@ export default function Setup({ onSetupComplete }: SetupProps) {
                   </p>
                 )}
               </div>
-            </div>
-
-            <div>
-              <label htmlFor="environment" className="block text-sm font-medium text-gray-700">
-                Environment
-              </label>
-              <select
-                id="environment"
-                value={environment}
-                onChange={(e) => setEnvironment(e.target.value as AppleEnvironment)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              >
-                <option value={AppleEnvironment.SANDBOX}>Sandbox</option>
-                <option value={AppleEnvironment.PRODUCTION}>Production</option>
-              </select>
             </div>
 
             {error && (

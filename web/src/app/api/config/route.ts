@@ -1,24 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServiceSupabase } from '@/lib/supabase'
 
 export async function GET() {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-
-    const response = await fetch(`${supabaseUrl}/rest/v1/config?select=*&id=eq.1`, {
-      headers: {
-        'apikey': supabaseServiceKey,
-        'Authorization': `Bearer ${supabaseServiceKey}`,
-        'Content-Type': 'application/json'
-      }
-    })
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch config: ${response.statusText}`)
+    const supabase = await getServiceSupabase()
+    
+    const { data, error } = await supabase
+      .from('config')
+      .select('*')
+      .eq('id', 1)
+      .single()
+    
+    if (error) {
+      throw new Error(`Failed to fetch config: ${error.message}`)
     }
-
-    const data = await response.json()
-    return NextResponse.json(data[0] || null)
+    
+    return NextResponse.json(data || null)
   } catch (error: any) {
     console.error('Error fetching config:', error)
     return NextResponse.json(
@@ -31,26 +28,25 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-
-    const response = await fetch(`${supabaseUrl}/rest/v1/config?id=eq.1`, {
-      method: 'PATCH',
-      headers: {
-        'apikey': supabaseServiceKey,
-        'Authorization': `Bearer ${supabaseServiceKey}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=representation'
-      },
-      body: JSON.stringify(body)
-    })
-
-    if (!response.ok) {
-      throw new Error(`Failed to update config: ${response.statusText}`)
+    const supabase = await getServiceSupabase()
+    
+    // Use UPSERT to handle both insert and update cases
+    const { data, error } = await supabase
+      .from('config')
+      .upsert({
+        id: 1,
+        ...body
+      })
+      .eq('id', 1)
+      .select()
+      .single()
+    
+    if (error) {
+      console.error('Config update failed:', error)
+      throw new Error(`Failed to update config: ${error.message}`)
     }
-
-    const data = await response.json()
-    return NextResponse.json(data[0] || null)
+    
+    return NextResponse.json(data || null)
   } catch (error: any) {
     console.error('Error updating config:', error)
     return NextResponse.json(

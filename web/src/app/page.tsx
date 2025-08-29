@@ -17,7 +17,7 @@ export default function Home() {
     try {
       const { data: config, error } = await supabase
         .from('config')
-        .select('apple_issuer_id, apple_key_id, apple_private_key')
+        .select('apple_issuer_id, apple_key_id, apple_private_key_id')
         .single()
 
       if (error) {
@@ -28,7 +28,7 @@ export default function Home() {
         const configured = !!(
           config?.apple_issuer_id && 
           config?.apple_key_id && 
-          config?.apple_private_key
+          config?.apple_private_key_id
         )
         setIsConfigured(configured)
       }
