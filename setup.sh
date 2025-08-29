@@ -166,7 +166,7 @@ echo "-------------------------------------------"
 CRON_CHECK=$(supabase db execute --sql "
 SELECT COUNT(*) as job_count 
 FROM cron.job 
-WHERE jobname IN ('process-pending-notifications', 'process-notifications-fallback')
+WHERE jobname = 'process-pending-notifications'
 AND active = true;
 " 2>/dev/null | grep -o '[0-9]' | head -1)
 

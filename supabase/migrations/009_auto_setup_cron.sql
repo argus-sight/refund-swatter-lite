@@ -44,17 +44,19 @@ BEGIN
     -- Generate a batch ID for this run
     v_batch_id := gen_random_uuid();
     
-    -- Mark pending notifications as ready to process
+    -- Mark pending and failed notifications as ready to process
     -- Only process notifications that are:
-    -- 1. In pending status
+    -- 1. In pending or failed status
     -- 2. Older than 5 minutes (to avoid race conditions)
     -- 3. Within the last 24 hours
+    -- 4. Failed notifications with less than 3 retries
     UPDATE notifications_raw
     SET 
         status = 'ready_to_process',
-        processed_at = NOW()
+        processed_at = NOW(),
+        retry_count = COALESCE(retry_count, 0) + 1
     WHERE 
-        status = 'pending'
+        (status = 'pending' OR (status = 'failed' AND COALESCE(retry_count, 0) < 3))
         AND received_at < NOW() - INTERVAL '5 minutes'
         AND received_at > NOW() - INTERVAL '24 hours';
     
@@ -93,12 +95,6 @@ BEGIN
     IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'process-pending-notifications') THEN
         PERFORM cron.unschedule('process-pending-notifications');
         RAISE NOTICE 'Removed existing cron job: process-pending-notifications';
-    END IF;
-    
-    -- Remove fallback job if exists
-    IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'process-notifications-fallback') THEN
-        PERFORM cron.unschedule('process-notifications-fallback');
-        RAISE NOTICE 'Removed existing cron job: process-notifications-fallback';
     END IF;
 END $$;
 
@@ -188,11 +184,11 @@ SELECT
      ORDER BY start_time DESC 
      LIMIT 1) as last_status
 FROM cron.job j
-WHERE j.jobname IN ('process-pending-notifications', 'process-notifications-fallback');
+WHERE j.jobname = 'process-pending-notifications';
 
 -- Add helpful comments
 COMMENT ON FUNCTION process_notifications_batch() IS 
-'Processes pending notifications in batches. Called by cron job every 5 minutes.';
+'Processes pending and failed notifications in batches. Called by cron job every 5 minutes. Failed notifications are retried up to 3 times.';
 
 COMMENT ON VIEW cron_job_monitor IS 
 'Monitor the status and history of notification processing cron jobs.';
@@ -206,7 +202,7 @@ BEGIN
     -- Count active cron jobs
     SELECT COUNT(*), string_agg(jobname, ', ')
     FROM cron.job 
-    WHERE jobname IN ('process-pending-notifications', 'process-notifications-fallback')
+    WHERE jobname = 'process-pending-notifications'
     AND active = true
     INTO v_job_count, v_job_names;
     

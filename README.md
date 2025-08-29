@@ -46,10 +46,16 @@ git clone <repository>
 cd refund-swatter-lite
 ```
 
-2. **Link to your Supabase project**
+2. **Configure your Supabase project**
+
+Option A: Link to existing project (recommended)
 ```bash
 supabase link --project-ref your-project-ref
 ```
+
+Option B: Manual configuration
+- Edit `supabase/config.toml` and update the `project_id` with your project reference
+- Update `.env` file with your Supabase credentials
 
 3. **One-Click Setup & Deploy**
 ```bash

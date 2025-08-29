@@ -13,3 +13,6 @@ dist/
 .vercel/
 .DS_Store
 volumes/
+
+# Supabase temporary files
+supabase/.temp/
