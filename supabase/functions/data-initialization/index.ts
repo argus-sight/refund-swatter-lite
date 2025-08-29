@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { AppleEnvironment, normalizeEnvironment, NotificationStatus, NotificationSource } from '../_shared/constants.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -78,10 +79,10 @@ async function storeNotifications(
         bundleVersion: notification.bundleVersion,
         status: notification.status
       },
-      environment: notification.data?.environment || (environment === 'sandbox' ? 'Sandbox' : 'Production'),
-      status: 'pending', // Will be processed later
+      environment: notification.data?.environment || normalizeEnvironment(environment),
+      status: NotificationStatus.PENDING, // Will be processed later
       received_at: new Date().toISOString(),
-      source: 'history_api', // Mark as coming from history API
+      source: NotificationSource.HISTORY_API, // Mark as coming from history API
       signed_date: notification.signedDate ? new Date(notification.signedDate) : null
     }))
 
@@ -284,7 +285,8 @@ async function initializeAllData(
   errors: any[]
 }> {
   
-  const apiBase = environment === 'sandbox' ? APPLE_API_BASE_SANDBOX : APPLE_API_BASE_PRODUCTION
+  const normalizedEnv = normalizeEnvironment(environment)
+  const apiBase = normalizedEnv === AppleEnvironment.SANDBOX ? APPLE_API_BASE_SANDBOX : APPLE_API_BASE_PRODUCTION
   let totalFetched = 0
   let totalInserted = 0
   let allErrors: any[] = []

@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import * as jose from 'https://deno.land/x/jose@v4.13.1/index.ts'
+import { AppleEnvironment, normalizeEnvironment, NotificationStatus, NotificationSource } from '../_shared/constants.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -105,8 +106,8 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     console.log(`[${requestId}] Supabase client initialized`)
 
-    // Determine environment from payload
-    const environment = payload.data?.environment || 'Production'
+    // Determine environment from payload and normalize it
+    const environment = normalizeEnvironment(payload.data?.environment)
     console.log(`[${requestId}] Environment determined: ${environment}`)
     
     // Decode signedTransactionInfo if present
@@ -160,8 +161,8 @@ serve(async (req) => {
         decoded_payload: modifiedPayload, // Store modified payload with decoded transaction info
         decoded_transaction_info: decodedTransactionInfo, // Also store separately for easy access
         environment: environment,
-        status: 'pending',
-        source: 'webhook', // Mark as coming from webhook
+        status: NotificationStatus.PENDING,
+        source: NotificationSource.WEBHOOK, // Mark as coming from webhook
         signed_date: signedDate
       })
       .select()

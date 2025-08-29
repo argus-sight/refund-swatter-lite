@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { AppleEnvironment, normalizeEnvironment, NotificationStatus } from '../_shared/constants.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -32,7 +33,7 @@ serve(async (req) => {
     let query = supabase
       .from('notifications_raw')
       .select('*')
-      .eq('status', 'pending')
+      .eq('status', NotificationStatus.PENDING)
       .order('received_at', { ascending: true })
       .limit(limit)
 
@@ -74,7 +75,7 @@ serve(async (req) => {
         const { error: updateError } = await supabase
           .from('notifications_raw')
           .update({ 
-            status: 'processed',
+            status: NotificationStatus.PROCESSED,
             processed_at: new Date().toISOString()
           })
           .eq('id', notification.id)
@@ -89,7 +90,7 @@ serve(async (req) => {
         await supabase
           .from('notifications_raw')
           .update({ 
-            status: 'failed',
+            status: NotificationStatus.FAILED,
             error_message: error.message
           })
           .eq('id', notification.id)

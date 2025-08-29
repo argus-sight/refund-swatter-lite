@@ -1,6 +1,7 @@
+// Keep the original enum for backward compatibility, but with standardized values
 export enum AppleEnvironment {
-  PRODUCTION = 'production',
-  SANDBOX = 'sandbox'
+  PRODUCTION = 'Production',  // Changed to match database/Edge Functions
+  SANDBOX = 'Sandbox'          // Changed to match database/Edge Functions
 }
 
 export const APPLE_API_BASE_PRODUCTION = 'https://api.storekit.itunes.apple.com/inApps/v1'
