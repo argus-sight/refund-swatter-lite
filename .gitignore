@@ -12,3 +12,4 @@ out/
 dist/
 .vercel/
 .DS_Store
+volumes/
