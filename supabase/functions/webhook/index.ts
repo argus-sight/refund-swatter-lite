@@ -40,6 +40,24 @@ async function verifyAppleJWS(signedPayload: string): Promise<any> {
   }
 }
 
+async function decodeSignedTransactionInfo(signedTransactionInfo: string): Promise<any> {
+  try {
+    // signedTransactionInfo is also a JWT, decode it without verification
+    // (verification already done at the outer level)
+    const parts = signedTransactionInfo.split('.')
+    if (parts.length !== 3) {
+      throw new Error('Invalid transaction JWT format')
+    }
+    
+    // Decode the payload (middle part)
+    const payload = JSON.parse(atob(parts[1]))
+    return payload
+  } catch (error) {
+    console.error('Failed to decode signedTransactionInfo:', error)
+    return null
+  }
+}
+
 serve(async (req) => {
   const requestId = crypto.randomUUID()
   const startTime = Date.now()
@@ -91,10 +109,46 @@ serve(async (req) => {
     const environment = payload.data?.environment || 'Production'
     console.log(`[${requestId}] Environment determined: ${environment}`)
     
+    // Decode signedTransactionInfo if present
+    let decodedTransactionInfo = null
+    if (payload.data?.signedTransactionInfo) {
+      console.log(`[${requestId}] Decoding signedTransactionInfo...`)
+      decodedTransactionInfo = await decodeSignedTransactionInfo(payload.data.signedTransactionInfo)
+      if (decodedTransactionInfo) {
+        console.log(`[${requestId}] Transaction ID: ${decodedTransactionInfo.transactionId}`)
+        console.log(`[${requestId}] Original Transaction ID: ${decodedTransactionInfo.originalTransactionId || 'N/A'}`)
+        console.log(`[${requestId}] Product ID: ${decodedTransactionInfo.productId}`)
+      }
+    }
+    
+    // Decode signedRenewalInfo if present
+    let decodedRenewalInfo = null
+    if (payload.data?.signedRenewalInfo) {
+      console.log(`[${requestId}] Decoding signedRenewalInfo...`)
+      try {
+        const parts = payload.data.signedRenewalInfo.split('.')
+        if (parts.length === 3) {
+          decodedRenewalInfo = JSON.parse(atob(parts[1]))
+        }
+      } catch (error) {
+        console.error(`[${requestId}] Failed to decode signedRenewalInfo:`, error)
+      }
+    }
+    
     // Extract signed date from payload
     const signedDate = payload.signedDate ? new Date(payload.signedDate) : null
     
-    // Store raw notification
+    // Create modified payload with decoded transaction info
+    const modifiedPayload = {
+      ...payload,
+      data: {
+        ...payload.data,
+        signedTransactionInfo: decodedTransactionInfo, // Replace JWT with decoded object
+        signedRenewalInfo: decodedRenewalInfo // Replace JWT with decoded object if present
+      }
+    }
+    
+    // Store raw notification with decoded transaction info
     console.log(`[${requestId}] Storing raw notification in database...`)
     const { data: notification, error: notificationError } = await supabase
       .from('notifications_raw')
@@ -103,7 +157,8 @@ serve(async (req) => {
         subtype: payload.subtype,
         notification_uuid: payload.notificationUUID,
         signed_payload: signedPayload,
-        decoded_payload: payload,
+        decoded_payload: modifiedPayload, // Store modified payload with decoded transaction info
+        decoded_transaction_info: decodedTransactionInfo, // Also store separately for easy access
         environment: environment,
         status: 'pending',
         source: 'webhook', // Mark as coming from webhook

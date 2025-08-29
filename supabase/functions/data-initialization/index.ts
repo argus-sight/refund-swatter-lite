@@ -466,6 +466,54 @@ serve(async (req) => {
       requestId
     )
 
+    // Trigger processing of the imported notifications
+    if (result.totalInserted > 0) {
+      console.log(`[${requestId}] ============================================================`)
+      console.log(`[${requestId}] Triggering notification processing for ${result.totalInserted} notifications...`)
+      
+      try {
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+        const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+        const processUrl = `${supabaseUrl}/functions/v1/process-notifications`
+        
+        // Fire and forget - don't wait for processing to complete
+        // Process in batches of 50 to avoid timeout
+        const batchSize = 50
+        const batches = Math.ceil(result.totalInserted / batchSize)
+        
+        console.log(`[${requestId}] Will process in ${batches} batch(es) of up to ${batchSize} notifications each`)
+        
+        for (let i = 0; i < batches; i++) {
+          fetch(processUrl, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${supabaseServiceKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              limit: batchSize
+            })
+          }).then(() => {
+            console.log(`[${requestId}] Batch ${i + 1} processing triggered successfully`)
+          }).catch(error => {
+            console.error(`[${requestId}] Failed to trigger batch ${i + 1} processing:`, error)
+          })
+          
+          // Small delay between batches to avoid overwhelming the system
+          if (i < batches - 1) {
+            await new Promise(resolve => setTimeout(resolve, 100))
+          }
+        }
+        
+        console.log(`[${requestId}] ✓ All notification processing batches triggered`)
+        console.log(`[${requestId}] ============================================================`)
+      } catch (error) {
+        console.error(`[${requestId}] ⚠️ Warning: Failed to trigger notification processing:`, error)
+        console.error(`[${requestId}] Notifications were imported but not processed automatically`)
+        console.error(`[${requestId}] They will remain in 'pending' status until manually processed`)
+      }
+    }
+
     const duration = Date.now() - startTime
     
     console.log(`[${requestId}] ************************************************************`)
@@ -482,7 +530,8 @@ serve(async (req) => {
           inserted: result.totalInserted,
           skipped: result.totalFetched - result.totalInserted,
           totalPages: result.totalPages,
-          errors: result.errors.length > 0 ? result.errors : undefined
+          errors: result.errors.length > 0 ? result.errors : undefined,
+          processingTriggered: result.totalInserted > 0
         },
         requestId,
         processingTime: duration
