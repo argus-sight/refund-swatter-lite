@@ -78,7 +78,7 @@ async function storeNotifications(
         bundleVersion: notification.bundleVersion,
         status: notification.status
       },
-      environment: notification.environment,
+      environment: notification.data?.environment || (environment === 'sandbox' ? 'Sandbox' : 'Production'),
       status: 'pending', // Will be processed later
       received_at: new Date().toISOString(),
       source: 'history_api', // Mark as coming from history API
