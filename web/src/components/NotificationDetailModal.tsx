@@ -29,21 +29,17 @@ export default function NotificationDetailModal({ notification, isOpen, onClose 
     return colors[status] || 'bg-gray-100 text-gray-800'
   }
 
-  // Decode signedTransactionInfo JWT if present
+  // Get signedTransactionInfo (already decoded in the database)
   const decodeSignedTransactionInfo = () => {
     try {
       const signedTransactionInfo = notification.decoded_payload?.data?.signedTransactionInfo
       if (!signedTransactionInfo) return null
       
-      // JWT has 3 parts: header.payload.signature
-      const parts = signedTransactionInfo.split('.')
-      if (parts.length !== 3) return null
-      
-      // Decode the payload (middle part)
-      const payload = JSON.parse(atob(parts[1]))
-      return payload
+      // The signedTransactionInfo is already decoded as a JSON object in the database
+      // No need to decode JWT here
+      return signedTransactionInfo
     } catch (error) {
-      console.error('Failed to decode signedTransactionInfo:', error)
+      console.error('Failed to get signedTransactionInfo:', error)
       return null
     }
   }
@@ -54,6 +50,12 @@ export default function NotificationDetailModal({ notification, isOpen, onClose 
       const signedRenewalInfo = notification.decoded_payload?.data?.signedRenewalInfo
       if (!signedRenewalInfo) return null
       
+      // Check if it's already decoded (object) or still a JWT string
+      if (typeof signedRenewalInfo === 'object') {
+        return signedRenewalInfo
+      }
+      
+      // If it's a string, decode the JWT
       const parts = signedRenewalInfo.split('.')
       if (parts.length !== 3) return null
       

@@ -63,10 +63,20 @@ serve(async (req) => {
   const requestId = crypto.randomUUID()
   const startTime = Date.now()
   
+  // Get request source IP (from headers or connection)
+  const sourceIP = req.headers.get('x-forwarded-for') || 
+                   req.headers.get('x-real-ip') || 
+                   req.headers.get('cf-connecting-ip') || // Cloudflare
+                   'unknown'
+  
+  // Get all headers for logging
+  const allHeaders = Object.fromEntries(req.headers.entries())
+  
   console.log(`[${requestId}] ==> Webhook Request Started`)
   console.log(`[${requestId}] Method: ${req.method}`)
   console.log(`[${requestId}] URL: ${req.url}`)
-  console.log(`[${requestId}] Headers:`, Object.fromEntries(req.headers.entries()))
+  console.log(`[${requestId}] Source IP: ${sourceIP}`)
+  console.log(`[${requestId}] All Headers:`, allHeaders)
   
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -74,10 +84,17 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  let rawBody: string | null = null
+  let body: any = null
+  
   try {
+    // Get raw body first for logging purposes
+    rawBody = await req.text()
+    console.log(`[${requestId}] Raw request body received, length: ${rawBody.length} bytes`)
+    
     // Parse request body
     console.log(`[${requestId}] Parsing request body...`)
-    const body = await req.json()
+    body = JSON.parse(rawBody)
     const { signedPayload } = body
     
     console.log(`[${requestId}] Request body parsed successfully`)
@@ -217,6 +234,20 @@ serve(async (req) => {
     console.error(`[${requestId}] Error message: ${error.message}`)
     console.error(`[${requestId}] Error stack:`, error.stack)
     console.error(`[${requestId}] Processing time before error: ${duration}ms`)
+    
+    // Log failed request details for debugging
+    console.error(`[${requestId}] Failed request details:`)
+    console.error(`[${requestId}] - Source IP: ${sourceIP}`)
+    console.error(`[${requestId}] - Headers:`, allHeaders)
+    if (rawBody) {
+      // Truncate very long payloads for logging
+      const truncatedBody = rawBody.length > 5000 ? 
+        rawBody.substring(0, 5000) + '... [truncated]' : 
+        rawBody
+      console.error(`[${requestId}] - Raw body: ${truncatedBody}`)
+    } else {
+      console.error(`[${requestId}] - Raw body: [not captured]`)
+    }
     
     return new Response(
       JSON.stringify({ 

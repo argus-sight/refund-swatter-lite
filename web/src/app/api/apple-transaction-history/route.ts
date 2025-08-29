@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAppleApiBase, AppleEnvironment } from '@/lib/apple'
+import { createClient } from '@supabase/supabase-js'
 
 export async function POST(request: NextRequest) {
   try {
@@ -37,6 +38,14 @@ export async function POST(request: NextRequest) {
       url += `?revision=${revision}`
     }
 
+    console.log('Fetching transaction history:', {
+      url,
+      transactionId,
+      environment,
+      apiBase
+    })
+
+    const startTime = Date.now()
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -45,6 +54,31 @@ export async function POST(request: NextRequest) {
     })
 
     const data = await response.json()
+    const duration = Date.now() - startTime
+    
+    console.log('Apple API response:', {
+      status: response.status,
+      ok: response.ok,
+      data
+    })
+
+    // Log to database
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+
+    await supabase.from('apple_api_logs').insert({
+      endpoint: url,
+      method: 'GET',
+      request_headers: { Authorization: 'Bearer [JWT]' },
+      request_body: null,
+      response_status: response.status,
+      response_headers: {},
+      response_body: data,
+      duration_ms: duration,
+      notes: `Transaction history for ${transactionId} in ${environment} environment`
+    })
 
     if (!response.ok) {
       throw new Error(data.errorMessage || 'Failed to fetch transaction history')
