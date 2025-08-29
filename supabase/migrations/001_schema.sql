@@ -1,7 +1,24 @@
--- Enable necessary extensions
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "pg_cron";
-CREATE EXTENSION IF NOT EXISTS "vault";
+-- Enable necessary extensions (safely)
+DO $$
+BEGIN
+    -- Create uuid-ossp extension if not exists
+    IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'uuid-ossp') THEN
+        CREATE EXTENSION "uuid-ossp";
+    END IF;
+    
+    -- Create pg_cron extension if not exists
+    IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
+        CREATE EXTENSION "pg_cron";
+    END IF;
+    
+    -- Create supabase_vault extension if not exists
+    IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'supabase_vault') THEN
+        CREATE EXTENSION "supabase_vault";
+    END IF;
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE NOTICE 'Some extensions may already exist: %', SQLERRM;
+END $$;
 
 -- Config table (single row only for single tenant)
 -- Note: Webhook URL is fixed at {SUPABASE_URL}/functions/v1/webhook

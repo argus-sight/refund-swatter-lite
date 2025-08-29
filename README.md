@@ -26,6 +26,18 @@ Refund Swatter Lite is a streamlined version of Refund Swatter designed for sing
 - Node.js 16+
 - Supabase CLI
 
+### Required Database Extensions
+
+Before running migrations, you must enable the following extensions in your Supabase dashboard:
+
+1. Go to your [Supabase Dashboard Extensions page](https://supabase.com/dashboard/project/_/database/extensions)
+2. Enable these extensions:
+   - **uuid-ossp** - For UUID generation (usually enabled by default)
+   - **pg_cron** - For scheduled jobs
+   - **vault** - For secure storage of Apple private keys
+
+> **Important**: The migrations will fail if these extensions are not enabled first. Wait about a minute after enabling for them to become available.
+
 ### Installation
 
 1. **Clone and setup**
@@ -34,24 +46,33 @@ git clone <repository>
 cd refund-swatter-lite
 ```
 
-2. **Configure environment**
+2. **Link to your Supabase project**
 ```bash
-cp .env.example .env
-# Edit .env with your Supabase credentials
+supabase link --project-ref your-project-ref
 ```
 
-3. **Run setup**
+3. **One-Click Setup & Deploy**
 ```bash
 ./setup.sh
 ```
 
-4. **Start the dashboard**
+This will:
+- Apply all database migrations
+- Deploy all Edge Functions  
+- Configure cron jobs automatically
+- Optionally initialize sample data
+
+4. **Configure Apple credentials in Supabase Dashboard**
+- Go to Settings → Edge Functions → Environment Variables
+- Add your Apple credentials (APPLE_PRIVATE_KEY, etc.)
+
+5. **Start the dashboard (optional for local development)**
 ```bash
 cd web
 npm run dev
 ```
 
-5. **Access dashboard**
+6. **Access dashboard**
 Open http://localhost:3000 in your browser
 
 ## Configuration
@@ -74,17 +95,9 @@ In App Store Connect:
 2. Set the URL to: `https://your-project.supabase.co/functions/v1/webhook`
 3. Enable notification types (especially CONSUMPTION_REQUEST)
 
-### Cron Job Setup
+### Automatic Cron Job Setup
 
-Process consumption requests every 5 minutes:
-
-```bash
-# Add to crontab
-*/5 * * * * curl -X POST https://your-project.supabase.co/functions/v1/process-jobs \
-  -H "x-cron-secret: YOUR_CRON_SECRET"
-```
-
-Or use a service like cron-job.org for managed cron jobs.
+The cron job is automatically configured during deployment to process consumption requests every 5 minutes. You can verify the setup in your Supabase Dashboard under Integrations > Cron.
 
 ## Dashboard Features
 

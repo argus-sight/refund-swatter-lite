@@ -1,9 +1,17 @@
--- Enable pg_cron extension if not already enabled
-CREATE EXTENSION IF NOT EXISTS pg_cron;
+-- pg_cron extension is enabled in 001_schema.sql
 
--- Grant usage on cron schema to postgres role
-GRANT USAGE ON SCHEMA cron TO postgres;
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA cron TO postgres;
+-- Grant usage on cron schema to postgres role (safely)
+DO $$
+BEGIN
+    -- Only grant if schema exists
+    IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'cron') THEN
+        GRANT USAGE ON SCHEMA cron TO postgres;
+        GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA cron TO postgres;
+    END IF;
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE NOTICE 'Cron permissions may already exist: %', SQLERRM;
+END $$;
 
 -- Note: The cron job will be created by setup.sh with actual environment values
 -- This is a placeholder to show the structure
