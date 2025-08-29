@@ -47,6 +47,30 @@ if [ -z "$PROJECT_ID" ]; then
     fi
 fi
 
+# Ensure .temp directory and files exist for Supabase CLI
+if [ ! -z "$PROJECT_ID" ]; then
+    # Create .temp directory if it doesn't exist
+    if [ ! -d "supabase/.temp" ]; then
+        echo "Creating Supabase temp directory..."
+        mkdir -p supabase/.temp
+    fi
+    
+    # Create project-ref file if it doesn't exist
+    if [ ! -f "supabase/.temp/project-ref" ]; then
+        echo "Creating project reference file..."
+        echo "$PROJECT_ID" > supabase/.temp/project-ref
+    fi
+    
+    # Create pooler-url file if it doesn't exist
+    if [ ! -f "supabase/.temp/pooler-url" ]; then
+        echo "Creating pooler URL file..."
+        # Standard Supabase pooler URL format
+        # Note: Region may vary (aws-0-us-east-1 or aws-1-us-east-1)
+        # Use printf instead of echo to avoid trailing newline
+        printf "postgresql://postgres.$PROJECT_ID:[YOUR-PASSWORD]@aws-1-us-east-1.pooler.supabase.com:6543/postgres" > supabase/.temp/pooler-url
+    fi
+fi
+
 echo "Project ID: $PROJECT_ID"
 echo ""
 
