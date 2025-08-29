@@ -178,36 +178,7 @@ else
     echo "  You can verify in Supabase Dashboard: Integrations > Cron"
 fi
 
-# Step 5: Initialize data (optional)
-echo ""
-read -p "Do you want to initialize sample data? (y/n): " -n 1 -r
-echo ""
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo "Initializing sample data..."
-    
-    PROJECT_URL="https://$PROJECT_ID.supabase.co"
-    ANON_KEY=$(supabase status --json 2>/dev/null | grep -o '"anon_key":"[^"]*' | cut -d'"' -f4)
-    
-    if [ -z "$ANON_KEY" ]; then
-        echo "  ⚠ Could not retrieve anon key. Skipping data initialization."
-    else
-        RESPONSE=$(curl -X POST "$PROJECT_URL/functions/v1/data-initialization" \
-            -H "Authorization: Bearer $ANON_KEY" \
-            -H "Content-Type: application/json" \
-            -d '{"action": "initialize"}' \
-            --silent --write-out "HTTPSTATUS:%{http_code}")
-        
-        HTTP_STATUS=$(echo $RESPONSE | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
-        
-        if [ "$HTTP_STATUS" -eq 200 ] || [ "$HTTP_STATUS" -eq 204 ]; then
-            echo "  ✓ Sample data initialized"
-        else
-            echo "  ⚠ Failed to initialize sample data (HTTP $HTTP_STATUS)"
-        fi
-    fi
-fi
-
-# Step 6: Web application setup (optional for local development)
+# Step 5: Web application setup (optional for local development)
 echo ""
 read -p "Do you want to setup the web dashboard for local development? (y/n): " -n 1 -r
 echo ""
