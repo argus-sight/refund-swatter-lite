@@ -348,17 +348,6 @@ export default function Dashboard() {
                 </p>
               </div>
 
-              <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-2">Cron Job</h3>
-                <p className="text-sm text-gray-600">
-                  Set up a cron job to process consumption requests every 5 minutes:
-                </p>
-                <pre className="mt-2 p-3 bg-gray-100 rounded text-xs font-mono">
-                  {`*/5 * * * * curl -X POST \\
-  ${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/process-jobs \\
-  -H "x-cron-secret: YOUR_CRON_SECRET"`}
-                </pre>
-              </div>
             </div>
           </div>
         )}
