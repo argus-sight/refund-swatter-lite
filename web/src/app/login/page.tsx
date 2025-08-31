@@ -40,14 +40,31 @@ export default function LoginPage() {
           .eq('id', data.user.id)
           .single()
 
-        if (adminUser?.must_change_password) {
+        // Only force password change if:
+        // 1. The must_change_password flag is true AND
+        // 2. They're using the default password
+        const isDefaultPassword = password === 'ChangeMe123!'
+        const needsPasswordChange = adminUser?.must_change_password && isDefaultPassword
+
+        if (needsPasswordChange) {
           router.push('/change-password')
         } else {
-          // Update last login time
-          await supabase
-            .from('admin_users')
-            .update({ last_login_at: new Date().toISOString() })
-            .eq('id', data.user.id)
+          // If they've changed from default password, clear the must_change_password flag
+          if (adminUser?.must_change_password && !isDefaultPassword) {
+            await supabase
+              .from('admin_users')
+              .update({ 
+                must_change_password: false,
+                last_login_at: new Date().toISOString() 
+              })
+              .eq('id', data.user.id)
+          } else {
+            // Just update last login time
+            await supabase
+              .from('admin_users')
+              .update({ last_login_at: new Date().toISOString() })
+              .eq('id', data.user.id)
+          }
 
           router.push('/')
         }
