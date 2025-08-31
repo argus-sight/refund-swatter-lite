@@ -51,7 +51,14 @@ export default function ConsumptionRequestModal({ request, onClose }: Consumptio
         return `${value} - ${platforms[value] || 'Unknown'}`
       
       case 'deliveryStatus':
-        const deliveryStatuses = ['Undeclared', 'Success', 'Failure', 'Server outage', 'Purchase not available']
+        const deliveryStatuses = [
+          'Delivered successfully',  // 0 - The app delivered the consumable and it's working properly
+          'Quality issue',           // 1 - Not delivered due to quality issue
+          'Wrong item',              // 2 - The app delivered the wrong item
+          'Server outage',           // 3 - Not delivered due to server outage
+          'Currency change',         // 4 - Not delivered due to in-game currency change
+          'Other reasons'            // 5 - Not delivered for other reasons
+        ]
         return `${value} - ${deliveryStatuses[value] || 'Unknown'}`
       
       case 'lifetimeDollarsPurchased':

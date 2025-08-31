@@ -18,6 +18,7 @@ export default function NotificationList({ environment }: NotificationListProps)
   const [totalCount, setTotalCount] = useState(0)
   const [selectedNotification, setSelectedNotification] = useState<any>(null)
   const [showDetail, setShowDetail] = useState(false)
+  const [retryingId, setRetryingId] = useState<string | null>(null)
   const itemsPerPage = 20
 
   useEffect(() => {
@@ -67,6 +68,35 @@ export default function NotificationList({ environment }: NotificationListProps)
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
+  }
+
+  const handleRetry = async (e: React.MouseEvent, notificationId: string) => {
+    e.stopPropagation() // Prevent row click
+    setRetryingId(notificationId)
+    
+    try {
+      const response = await fetch('/api/retry-notification', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ notificationId })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to retry notification')
+      }
+
+      // Reload notifications after successful retry
+      setTimeout(() => loadNotifications(), 1000)
+    } catch (error) {
+      console.error('Error retrying notification:', error)
+      alert(error instanceof Error ? error.message : 'Failed to retry notification')
+    } finally {
+      setRetryingId(null)
+    }
   }
 
   const getStatusBadge = (status: string) => {
@@ -152,6 +182,9 @@ export default function NotificationList({ environment }: NotificationListProps)
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Signed Date
                 </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -183,6 +216,17 @@ export default function NotificationList({ environment }: NotificationListProps)
                       ? format(new Date(notification.signed_date), 'MMM dd, HH:mm')
                       : format(new Date(notification.received_at), 'MMM dd, HH:mm')
                     }
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    {(notification.status === 'failed' || notification.status === 'pending') && (
+                      <button
+                        onClick={(e) => handleRetry(e, notification.id)}
+                        disabled={retryingId === notification.id}
+                        className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {retryingId === notification.id ? 'Retrying...' : 'Retry'}
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

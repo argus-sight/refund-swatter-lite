@@ -35,6 +35,7 @@ export default function ConsumptionRequestHistory({ environment }: ConsumptionRe
   const [selectedRequest, setSelectedRequest] = useState<ConsumptionRequest | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [statusFilter, setStatusFilter] = useState('all')
+  const [resendingId, setResendingId] = useState<string | null>(null)
 
   useEffect(() => {
     loadRequests()
@@ -73,6 +74,35 @@ export default function ConsumptionRequestHistory({ environment }: ConsumptionRe
   const handleViewDetails = (request: ConsumptionRequest) => {
     setSelectedRequest(request)
     setShowModal(true)
+  }
+
+  const handleResend = async (e: React.MouseEvent, requestId: string) => {
+    e.stopPropagation()
+    setResendingId(requestId)
+    
+    try {
+      const response = await fetch('/api/resend-consumption', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ requestId })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to resend consumption data')
+      }
+
+      // Reload requests after successful resend
+      setTimeout(() => loadRequests(), 1000)
+    } catch (error) {
+      console.error('Error resending consumption data:', error)
+      alert(error instanceof Error ? error.message : 'Failed to resend consumption data')
+    } finally {
+      setResendingId(null)
+    }
   }
 
   const getStatusBadge = (status: string) => {
@@ -246,12 +276,24 @@ export default function ConsumptionRequestHistory({ environment }: ConsumptionRe
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button
-                        onClick={() => handleViewDetails(request)}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        View Details
-                      </button>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => handleViewDetails(request)}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          View Details
+                        </button>
+                        {(request.request_status === 'failed' || request.request_status === 'pending' || 
+                          request.apple_response_status.includes('Failed') || request.apple_response_status.includes('Error')) && (
+                          <button
+                            onClick={(e) => handleResend(e, request.request_id)}
+                            disabled={resendingId === request.request_id}
+                            className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {resendingId === request.request_id ? 'Resending...' : 'Resend'}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
