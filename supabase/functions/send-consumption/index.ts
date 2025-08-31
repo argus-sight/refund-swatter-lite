@@ -50,7 +50,7 @@ async function sendConsumptionToApple(
   supabase: any,
   consumptionRequestId?: string,
   requestId?: string
-): Promise<{ success: boolean; response?: any; error?: string }> {
+): Promise<{ success: boolean; response?: any; error?: string; statusCode?: number }> {
   const startTime = Date.now()
   let logId: string | null = null
   const reqId = requestId || 'unknown'
@@ -118,13 +118,15 @@ async function sendConsumptionToApple(
       console.log('Successfully sent consumption data to Apple')
       return { 
         success: true, 
-        response: responseText ? JSON.parse(responseText) : null 
+        response: responseText ? JSON.parse(responseText) : null,
+        statusCode: response.status
       }
     } else {
       console.error('Apple API error:', response.status, responseText)
       return { 
         success: false, 
-        error: `Apple API returned ${response.status}: ${responseText}` 
+        error: `Apple API returned ${response.status}: ${responseText}`,
+        statusCode: response.status
       }
     }
   } catch (error) {
@@ -271,12 +273,13 @@ serve(async (req) => {
       )
 
       if (result.success) {
-        // Update job as sent
+        // Update job as sent with status code
         await supabase
           .from('send_consumption_jobs')
           .update({
             status: 'sent',
             response_data: result.response,
+            response_status_code: result.statusCode,
             sent_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           })
@@ -293,7 +296,7 @@ serve(async (req) => {
 
         results.push({ job_id: job.id, success: true })
       } else {
-        // Update job as failed with retry logic
+        // Update job as failed with retry logic and status code
         const newRetryCount = job.retry_count + 1
         const shouldRetry = newRetryCount < job.max_retries
         
@@ -302,6 +305,7 @@ serve(async (req) => {
           .update({
             status: shouldRetry ? 'pending' : 'failed',
             error_message: result.error,
+            response_status_code: result.statusCode,
             retry_count: newRetryCount,
             scheduled_at: shouldRetry 
               ? new Date(Date.now() + (5 * 60 * 1000)).toISOString() // Retry in 5 minutes

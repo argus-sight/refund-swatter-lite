@@ -2,9 +2,10 @@
 
 interface ConsumptionMetricsProps {
   stats: any
+  environment?: string
 }
 
-export default function ConsumptionMetrics({ stats }: ConsumptionMetricsProps) {
+export default function ConsumptionMetrics({ stats, environment }: ConsumptionMetricsProps) {
   if (!stats) {
     return (
       <div className="bg-white rounded-lg shadow p-6">
@@ -51,9 +52,20 @@ export default function ConsumptionMetrics({ stats }: ConsumptionMetricsProps) {
     <div className="space-y-4">
       <div className="bg-white rounded-lg shadow">
         <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
-          <h3 className="text-lg leading-6 font-medium text-gray-900">
-            Consumption Metrics (Last 30 Days)
-          </h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg leading-6 font-medium text-gray-900">
+              Consumption Metrics (Last 30 Days)
+            </h3>
+            {environment && (
+              <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                environment === 'Production' 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-yellow-100 text-yellow-800'
+              }`}>
+                {environment}
+              </span>
+            )}
+          </div>
         </div>
         <div className="p-6">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">

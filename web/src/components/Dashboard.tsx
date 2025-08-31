@@ -9,6 +9,7 @@ import TestNotification from './TestNotification'
 import NotificationHistory from './tools/NotificationHistory'
 import RefundHistory from './tools/RefundHistory'
 import TransactionHistory from './tools/TransactionHistory'
+import ConsumptionRequestHistory from './tools/ConsumptionRequestHistory'
 import { 
   Cog6ToothIcon, 
   DocumentTextIcon, 
@@ -16,7 +17,8 @@ import {
   ArrowPathIcon,
   ClockIcon,
   CurrencyDollarIcon,
-  ChartBarIcon
+  ChartBarIcon,
+  PaperAirplaneIcon
 } from '@heroicons/react/24/outline'
 
 export default function Dashboard() {
@@ -29,8 +31,13 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadConfig()
-    loadStats()
+    loadStats(environment)
   }, [])
+
+  // Reload stats when environment changes
+  useEffect(() => {
+    loadStats(environment)
+  }, [environment])
 
   const loadConfig = async () => {
     try {
@@ -49,9 +56,9 @@ export default function Dashboard() {
     setLoading(false)
   }
 
-  const loadStats = async () => {
+  const loadStats = async (env: AppleEnvironment) => {
     try {
-      const response = await fetch('/api/consumption-metrics')
+      const response = await fetch(`/api/consumption-metrics?environment=${env}`)
       if (response.ok) {
         const data = await response.json()
         setStats(data)
@@ -112,6 +119,7 @@ export default function Dashboard() {
     { id: 'notifications', name: 'Notifications', icon: DocumentTextIcon },
     { id: 'test', name: 'Test & Initialize', icon: BeakerIcon },
     { id: 'notification-history', name: 'Notification History', icon: ClockIcon },
+    { id: 'consumption-requests', name: 'Consumption Requests', icon: PaperAirplaneIcon },
     { id: 'refund-history', name: 'Refund History', icon: ArrowPathIcon },
     { id: 'transaction-history', name: 'Transaction History', icon: CurrencyDollarIcon },
     { id: 'settings', name: 'Settings', icon: Cog6ToothIcon },
@@ -178,7 +186,7 @@ export default function Dashboard() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === 'overview' && (
           <div className="space-y-6">
-            <ConsumptionMetrics stats={stats} />
+            <ConsumptionMetrics stats={stats} environment={environment} />
             
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-lg font-semibold mb-4">Configuration Status</h2>
@@ -223,6 +231,10 @@ export default function Dashboard() {
 
         {activeTab === 'refund-history' && (
           <RefundHistory environment={environment} />
+        )}
+
+        {activeTab === 'consumption-requests' && (
+          <ConsumptionRequestHistory environment={environment} />
         )}
 
         {activeTab === 'transaction-history' && (
