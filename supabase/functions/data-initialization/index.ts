@@ -1,11 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { AppleEnvironment, normalizeEnvironment, NotificationStatus, NotificationSource } from '../_shared/constants.ts'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { verifyAuth, handleCors, getCorsHeaders } from '../_shared/auth.ts'
 
 // Apple API base URLs
 const APPLE_API_BASE_PRODUCTION = 'https://api.storekit.itunes.apple.com/inApps/v1'
@@ -392,12 +388,30 @@ serve(async (req) => {
   console.log(`[${requestId}] ************************************************************`)
   
   // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
+  const corsResponse = handleCors(req)
+  if (corsResponse) {
     console.log(`[${requestId}] CORS preflight request handled`)
-    return new Response('ok', { headers: corsHeaders })
+    return corsResponse
   }
 
+  // Verify authentication - require admin users only (no service role for this function)
+  const auth = await verifyAuth(req, {
+    allowServiceRole: false,  // This function should only be called by admin users
+    requireAdmin: true
+  })
+
+  if (!auth.isValid) {
+    console.log(`[${requestId}] Authentication failed`)
+    return auth.errorResponse!
+  }
+
+  console.log(`[${requestId}] User authenticated: ${auth.user?.email}`)
+
   try {
+    // Initialize Supabase URLs and keys
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    
     // Parse request body
     const body = await req.json()
     const { 
@@ -424,16 +438,14 @@ serve(async (req) => {
           requestId
         }),
         { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: { ...getCorsHeaders(), 'Content-Type': 'application/json' },
           status: 400 
         }
       )
     }
 
-    // Initialize Supabase client
-    console.log(`[${requestId}] Initializing Supabase client...`)
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    // Use service role client for actual operations
+    console.log(`[${requestId}] Initializing Supabase service client...`)
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     
     // Get Apple JWT
@@ -539,7 +551,7 @@ serve(async (req) => {
         processingTime: duration
       }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...getCorsHeaders(), 'Content-Type': 'application/json' },
         status: 200 
       }
     )
@@ -562,7 +574,7 @@ serve(async (req) => {
         processingTime: duration
       }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...getCorsHeaders(), 'Content-Type': 'application/json' },
         status: 500 
       }
     )

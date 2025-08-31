@@ -1,32 +1,36 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, x-cron-secret, content-type',
-}
+import { verifyAuth, handleCors, getCorsHeaders } from '../_shared/auth.ts'
 
 serve(async (req) => {
   // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+  const corsResponse = handleCors(req)
+  if (corsResponse) {
+    return corsResponse
+  }
+
+  // Check for cron secret first (backward compatibility)
+  const cronSecret = req.headers.get('x-cron-secret')
+  const expectedSecret = Deno.env.get('CRON_SECRET')
+  const hasCronSecret = expectedSecret && cronSecret === expectedSecret
+
+  // If no valid cron secret, verify JWT auth
+  if (!hasCronSecret) {
+    const auth = await verifyAuth(req, {
+      allowServiceRole: true,
+      requireAdmin: true
+    })
+
+    if (!auth.isValid) {
+      console.error('Authentication failed')
+      return auth.errorResponse!
+    }
+    
+    console.log(`Authenticated: ${auth.isServiceRole ? 'Service Role' : `User ${auth.user?.email}`}`)
+  } else {
+    console.log('Authenticated via cron secret')
   }
 
   try {
-    // Verify cron secret
-    const cronSecret = req.headers.get('x-cron-secret')
-    const expectedSecret = Deno.env.get('CRON_SECRET')
-    
-    if (expectedSecret && cronSecret !== expectedSecret) {
-      console.error('Invalid cron secret')
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 401
-        }
-      )
-    }
-
     console.log('Processing consumption jobs...')
     
     // Call send-consumption function to process pending jobs
@@ -52,7 +56,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify(result),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...getCorsHeaders(), 'Content-Type': 'application/json' },
         status: 200 
       }
     )
@@ -62,7 +66,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...getCorsHeaders(), 'Content-Type': 'application/json' },
         status: 500
       }
     )

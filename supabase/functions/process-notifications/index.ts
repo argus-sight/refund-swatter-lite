@@ -1,11 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { AppleEnvironment, normalizeEnvironment, NotificationStatus } from '../_shared/constants.ts'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { verifyAuth, handleCors, getCorsHeaders } from '../_shared/auth.ts'
 
 interface ProcessOptions {
   limit?: number
@@ -13,10 +9,23 @@ interface ProcessOptions {
 }
 
 serve(async (req) => {
-  // Handle CORS
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+  // Handle CORS preflight
+  const corsResponse = handleCors(req)
+  if (corsResponse) {
+    return corsResponse
   }
+
+  // Verify authentication - allow both service role and admin users
+  const auth = await verifyAuth(req, {
+    allowServiceRole: true,
+    requireAdmin: true
+  })
+
+  if (!auth.isValid) {
+    return auth.errorResponse!
+  }
+
+  console.log(`Authenticated: ${auth.isServiceRole ? 'Service Role' : `User ${auth.user?.email}`}`)
 
   try {
     // Create Supabase client
@@ -54,7 +63,7 @@ serve(async (req) => {
           message: 'No pending notifications to process' 
         }),
         { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: { ...getCorsHeaders(), 'Content-Type': 'application/json' },
           status: 200 
         }
       )
@@ -112,7 +121,7 @@ serve(async (req) => {
         errors: results.errors.length > 0 ? results.errors : undefined
       }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...getCorsHeaders(), 'Content-Type': 'application/json' },
         status: 200 
       }
     )
@@ -123,7 +132,7 @@ serve(async (req) => {
         error: error.message 
       }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...getCorsHeaders(), 'Content-Type': 'application/json' },
         status: 400 
       }
     )

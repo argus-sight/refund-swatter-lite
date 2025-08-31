@@ -1,4 +1,5 @@
 import './globals.css'
+import { AuthProvider } from '@/contexts/AuthContext'
 
 export const metadata = {
   title: 'Refund Swatter Lite',
@@ -12,7 +13,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <AuthProvider>
+          {children}
+        </AuthProvider>
+      </body>
     </html>
   )
 }

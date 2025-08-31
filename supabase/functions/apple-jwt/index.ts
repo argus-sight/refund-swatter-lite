@@ -1,11 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import * as jose from 'https://deno.land/x/jose@v4.13.1/index.ts'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { verifyAuth, handleCors, getCorsHeaders } from '../_shared/auth.ts'
 
 serve(async (req) => {
   const requestId = crypto.randomUUID()
@@ -14,13 +10,26 @@ serve(async (req) => {
   console.log(`[${requestId}] ==> Apple JWT Generation Request Started`)
   console.log(`[${requestId}] Method: ${req.method}`)
   console.log(`[${requestId}] URL: ${req.url}`)
-  console.log(`[${requestId}] Headers:`, Object.fromEntries(req.headers.entries()))
   
   // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
+  const corsResponse = handleCors(req)
+  if (corsResponse) {
     console.log(`[${requestId}] CORS preflight request handled`)
-    return new Response('ok', { headers: corsHeaders })
+    return corsResponse
   }
+
+  // Verify authentication - only allow service role (internal calls)
+  const auth = await verifyAuth(req, {
+    allowServiceRole: true,
+    requireAdmin: false  // Service role doesn't need admin check
+  })
+
+  if (!auth.isValid) {
+    console.log(`[${requestId}] Authentication failed`)
+    return auth.errorResponse!
+  }
+
+  console.log(`[${requestId}] Authenticated: ${auth.isServiceRole ? 'Service Role' : 'User'}`)
 
   try {
     // Parse request body if needed (not used in single-tenant setup)
@@ -148,7 +157,7 @@ serve(async (req) => {
         processingTime: duration 
       }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...getCorsHeaders(), 'Content-Type': 'application/json' },
         status: 200 
       }
     )
@@ -169,7 +178,7 @@ serve(async (req) => {
         processingTime: duration
       }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...getCorsHeaders(), 'Content-Type': 'application/json' },
         status: 500
       }
     )

@@ -1,19 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 
 export async function POST(request: NextRequest) {
   try {
+    // Get the user's session
+    const cookieStore = await cookies()
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name: string) {
+            return cookieStore.get(name)?.value
+          },
+        },
+      }
+    )
+    const { data: { session } } = await supabase.auth.getSession()
+    
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+    
     const body = await request.json()
     const { limit = 50, source } = body
     
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+    const userToken = session.access_token
     
     console.log(`Processing pending notifications: limit=${limit}, source=${source || 'all'}`)
     
     // Get count of pending notifications
-    const supabase = await getServiceSupabase()
-    let countQuery = supabase
+    const serviceSupabase = await getServiceSupabase()
+    let countQuery = serviceSupabase
       .from('notifications_raw')
       .select('id', { count: 'exact', head: true })
       .eq('status', 'pending')
@@ -53,7 +77,7 @@ export async function POST(request: NextRequest) {
         const response = await fetch(`${supabaseUrl}/functions/v1/process-notifications`, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${supabaseServiceKey}`,
+            'Authorization': `Bearer ${userToken}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({

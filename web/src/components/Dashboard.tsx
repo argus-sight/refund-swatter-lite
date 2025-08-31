@@ -221,7 +221,7 @@ export default function Dashboard() {
         {activeTab === 'test' && (
           <div className="space-y-6">
             <TestNotification environment={environment} />
-            <DataInitialization environment={environment} onComplete={loadStats} />
+            <DataInitialization environment={environment} onComplete={() => loadStats(environment)} />
           </div>
         )}
 

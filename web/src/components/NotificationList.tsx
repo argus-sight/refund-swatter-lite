@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
+import { createBrowserClient } from '@supabase/ssr'
 import { AppleEnvironment } from '@/lib/apple'
 import { format } from 'date-fns'
 import NotificationDetailModal from './NotificationDetailModal'
@@ -20,6 +20,12 @@ export default function NotificationList({ environment }: NotificationListProps)
   const [showDetail, setShowDetail] = useState(false)
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const itemsPerPage = 20
+
+  // Create authenticated supabase client
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
 
   useEffect(() => {
     loadNotifications()

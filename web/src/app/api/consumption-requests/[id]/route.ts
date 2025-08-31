@@ -3,9 +3,10 @@ import { createClient } from '@supabase/supabase-js'
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
     
@@ -14,7 +15,7 @@ export async function GET(
     const { data, error } = await supabase
       .from('consumption_request_details')
       .select('*')
-      .eq('request_id', params.id)
+      .eq('request_id', id)
       .single()
 
     if (error) {

@@ -1,10 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { verifyAuth, handleCors, getCorsHeaders } from '../_shared/auth.ts'
 
 // Apple API base URLs
 const APPLE_API_BASE_PRODUCTION = 'https://api.storekit.itunes.apple.com/inApps/v1'
@@ -325,10 +321,24 @@ serve(async (req) => {
   console.log(`[${requestId}] ************************************************************`)
   
   // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
+  const corsResponse = handleCors(req)
+  if (corsResponse) {
     console.log(`[${requestId}] CORS preflight request handled`)
-    return new Response('ok', { headers: corsHeaders })
+    return corsResponse
   }
+
+  // Verify authentication - allow both service role and admin users
+  const auth = await verifyAuth(req, {
+    allowServiceRole: true,
+    requireAdmin: true
+  })
+
+  if (!auth.isValid) {
+    console.log(`[${requestId}] Authentication failed`)
+    return auth.errorResponse!
+  }
+
+  console.log(`[${requestId}] Authenticated: ${auth.isServiceRole ? 'Service Role' : `User ${auth.user?.email}`}`)
 
   try {
     // Parse request body
@@ -357,7 +367,7 @@ serve(async (req) => {
           requestId
         }),
         { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: { ...getCorsHeaders(), 'Content-Type': 'application/json' },
           status: 400 
         }
       )
@@ -418,7 +428,7 @@ serve(async (req) => {
         processingTime: duration
       }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...getCorsHeaders(), 'Content-Type': 'application/json' },
         status: 200 
       }
     )
@@ -441,7 +451,7 @@ serve(async (req) => {
         processingTime: duration
       }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...getCorsHeaders(), 'Content-Type': 'application/json' },
         status: 500 
       }
     )

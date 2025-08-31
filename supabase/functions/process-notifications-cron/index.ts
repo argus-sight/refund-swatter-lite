@@ -1,26 +1,40 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { verifyAuth, handleCors, getCorsHeaders } from '../_shared/auth.ts'
 
 serve(async (req) => {
-  // Handle CORS
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+  // Handle CORS preflight
+  const corsResponse = handleCors(req)
+  if (corsResponse) {
+    return corsResponse
   }
 
   const startTime = Date.now()
   console.log('[CRON] Process notifications cron job started')
 
-  try {
-    // Verify this is a valid cron request (check authorization header)
-    const authHeader = req.headers.get('authorization')
-    if (!authHeader) {
-      throw new Error('Unauthorized: Missing authorization header')
+  // Check for cron secret first (backward compatibility)
+  const cronSecret = req.headers.get('x-cron-secret')
+  const expectedSecret = Deno.env.get('CRON_SECRET')
+  const hasCronSecret = expectedSecret && cronSecret === expectedSecret
+
+  // If no valid cron secret, verify JWT auth
+  if (!hasCronSecret) {
+    const auth = await verifyAuth(req, {
+      allowServiceRole: true,
+      requireAdmin: true
+    })
+
+    if (!auth.isValid) {
+      console.error('[CRON] Authentication failed')
+      return auth.errorResponse!
     }
+    
+    console.log(`[CRON] Authenticated: ${auth.isServiceRole ? 'Service Role' : `User ${auth.user?.email}`}`)
+  } else {
+    console.log('[CRON] Authenticated via cron secret')
+  }
+
+  try {
 
     // Create Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
@@ -74,7 +88,7 @@ serve(async (req) => {
           duration: Date.now() - startTime
         }),
         { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: { ...getCorsHeaders(), 'Content-Type': 'application/json' },
           status: 200 
         }
       )
@@ -154,7 +168,7 @@ serve(async (req) => {
         duration
       }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...getCorsHeaders(), 'Content-Type': 'application/json' },
         status: 200 
       }
     )
@@ -169,7 +183,7 @@ serve(async (req) => {
         duration
       }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...getCorsHeaders(), 'Content-Type': 'application/json' },
         status: 500 
       }
     )
