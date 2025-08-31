@@ -8,7 +8,6 @@ import DataInitialization from './DataInitialization'
 import TestNotification from './TestNotification'
 import NotificationHistory from './tools/NotificationHistory'
 import RefundHistory from './tools/RefundHistory'
-import TransactionHistory from './tools/TransactionHistory'
 import ConsumptionRequestHistory from './tools/ConsumptionRequestHistory'
 import ManualReprocess from './tools/ManualReprocess'
 import { 
@@ -17,7 +16,6 @@ import {
   BeakerIcon,
   ArrowPathIcon,
   ClockIcon,
-  CurrencyDollarIcon,
   ChartBarIcon,
   PaperAirplaneIcon,
   ArrowUturnLeftIcon
@@ -123,7 +121,6 @@ export default function Dashboard() {
     { id: 'notification-history', name: 'Notification History', icon: ClockIcon },
     { id: 'consumption-requests', name: 'Consumption Requests', icon: PaperAirplaneIcon },
     { id: 'refund-history', name: 'Refund History', icon: ArrowPathIcon },
-    { id: 'transaction-history', name: 'Transaction History', icon: CurrencyDollarIcon },
     { id: 'manual-reprocess', name: 'Manual Reprocess', icon: ArrowUturnLeftIcon },
     { id: 'settings', name: 'Settings', icon: Cog6ToothIcon },
   ]
@@ -238,10 +235,6 @@ export default function Dashboard() {
 
         {activeTab === 'consumption-requests' && (
           <ConsumptionRequestHistory environment={environment} />
-        )}
-
-        {activeTab === 'transaction-history' && (
-          <TransactionHistory environment={environment} />
         )}
 
         {activeTab === 'manual-reprocess' && (

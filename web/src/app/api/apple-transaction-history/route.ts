@@ -84,12 +84,33 @@ export async function POST(request: NextRequest) {
       throw new Error(data.errorMessage || 'Failed to fetch transaction history')
     }
 
-    // Parse signed transactions
+    // Parse signed transactions (JWS format)
     const transactions = data.signedTransactions?.map((signedTx: string) => {
       try {
-        const payload = JSON.parse(atob(signedTx.split('.')[1]))
+        // signedTx is in JWS format: header.payload.signature
+        const parts = signedTx.split('.')
+        if (parts.length !== 3) {
+          console.error('Invalid JWS format')
+          return null
+        }
+        
+        // Decode the payload (second part)
+        const payload = JSON.parse(atob(parts[1]))
+        
+        // Transform milliseconds to readable dates
+        if (payload.purchaseDate) {
+          payload.purchaseDateFormatted = new Date(payload.purchaseDate).toISOString()
+        }
+        if (payload.originalPurchaseDate) {
+          payload.originalPurchaseDateFormatted = new Date(payload.originalPurchaseDate).toISOString()
+        }
+        if (payload.expiresDate) {
+          payload.expiresDateFormatted = new Date(payload.expiresDate).toISOString()
+        }
+        
         return payload
-      } catch {
+      } catch (error) {
+        console.error('Error parsing transaction:', error)
         return null
       }
     }).filter(Boolean)

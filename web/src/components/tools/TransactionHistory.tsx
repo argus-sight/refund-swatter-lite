@@ -104,6 +104,18 @@ export default function TransactionHistory({ environment }: TransactionHistoryPr
             <h3 className="text-sm font-medium text-gray-700 mb-2">
               Transaction History ({result.transactions?.length || 0} transactions)
             </h3>
+            {transactionId && result.transactions && result.transactions.length > 0 && 
+             !result.transactions.some((tx: any) => 
+               tx.transactionId === transactionId || 
+               tx.originalTransactionId === transactionId
+             ) && (
+              <div className="mb-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+                <p className="text-xs text-yellow-800">
+                  <strong>Note:</strong> The queried transaction ID ({transactionId}) was not found in the results. 
+                  Apple may have returned related transactions for the same user account.
+                </p>
+              </div>
+            )}
             {result.hasMore && (
               <p className="text-xs text-gray-600 mb-2">
                 More transactions available. Revision: {result.revision}
@@ -115,6 +127,16 @@ export default function TransactionHistory({ environment }: TransactionHistoryPr
                   {result.transactions.map((tx: any, index: number) => (
                     <div key={index} className="bg-white p-3 rounded">
                       <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div className="col-span-2">
+                          <span className="text-gray-600">Transaction ID:</span>
+                          <p className="text-xs font-mono">{tx.transactionId || 'N/A'}</p>
+                        </div>
+                        {tx.originalTransactionId && tx.originalTransactionId !== tx.transactionId && (
+                          <div className="col-span-2">
+                            <span className="text-gray-600">Original Transaction ID:</span>
+                            <p className="text-xs font-mono">{tx.originalTransactionId}</p>
+                          </div>
+                        )}
                         <div>
                           <span className="text-gray-600">Product:</span>
                           <p className="text-xs font-semibold">{tx.productId}</p>
@@ -125,20 +147,25 @@ export default function TransactionHistory({ environment }: TransactionHistoryPr
                         </div>
                         <div>
                           <span className="text-gray-600">Purchase Date:</span>
-                          <p className="text-xs">{new Date(tx.purchaseDate).toLocaleDateString('en-US', { 
-                            year: 'numeric', 
-                            month: '2-digit', 
-                            day: '2-digit' 
-                          })}</p>
+                          <p className="text-xs">{tx.purchaseDateFormatted ? 
+                            new Date(tx.purchaseDateFormatted).toLocaleDateString('en-US', { 
+                              year: 'numeric', 
+                              month: '2-digit', 
+                              day: '2-digit' 
+                            }) : 'N/A'}</p>
                         </div>
                         <div>
                           <span className="text-gray-600">Price:</span>
-                          <p className="text-xs">${(tx.price / 1000).toFixed(2)} {tx.currency}</p>
+                          <p className="text-xs">
+                            {tx.price && tx.currency ? 
+                              `${tx.currency === 'USD' ? '$' : tx.currency + ' '}${(tx.price / 1000).toFixed(2)}` : 
+                              'N/A'}
+                          </p>
                         </div>
-                        {tx.expiresDate && (
+                        {tx.expiresDateFormatted && (
                           <div className="col-span-2">
                             <span className="text-gray-600">Expires:</span>
-                            <p className="text-xs">{new Date(tx.expiresDate).toLocaleDateString('en-US', { 
+                            <p className="text-xs">{new Date(tx.expiresDateFormatted).toLocaleDateString('en-US', { 
                               year: 'numeric', 
                               month: '2-digit', 
                               day: '2-digit' 
