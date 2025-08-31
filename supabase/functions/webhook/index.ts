@@ -92,6 +92,9 @@ serve(async (req) => {
     rawBody = await req.text()
     console.log(`[${requestId}] Raw request body received, length: ${rawBody.length} bytes`)
     
+    // Log the complete raw POST body
+    console.log(`[${requestId}] Raw POST body:`, rawBody)
+    
     // Parse request body
     console.log(`[${requestId}] Parsing request body...`)
     body = JSON.parse(rawBody)
@@ -99,6 +102,9 @@ serve(async (req) => {
     
     console.log(`[${requestId}] Request body parsed successfully`)
     console.log(`[${requestId}] Body keys:`, Object.keys(body))
+    
+    // Log the parsed POST body
+    console.log(`[${requestId}] Parsed POST body:`, JSON.stringify(body, null, 2))
 
     console.log(`[${requestId}] Apple Store Server Notification received`)
 
@@ -166,6 +172,46 @@ serve(async (req) => {
       }
     }
     
+    // If this is a CONSUMPTION_REQUEST, store it in the dedicated table
+    if (payload.notificationType === 'CONSUMPTION_REQUEST') {
+      console.log(`[${requestId}] Detected CONSUMPTION_REQUEST, storing in consumption_request_webhooks table...`)
+      
+      // Extract consumption request specific data
+      const consumptionRequestReason = payload.data?.consumptionRequestReason?.reason || null
+      const deadline = payload.data?.consumptionRequestReason?.deadline ? 
+        new Date(payload.data.consumptionRequestReason.deadline).toISOString() : null
+      
+      const { data: consumptionWebhook, error: consumptionError } = await supabase
+        .from('consumption_request_webhooks')
+        .insert({
+          request_id: requestId,
+          source_ip: sourceIP,
+          raw_body: rawBody,
+          parsed_body: body,
+          notification_type: payload.notificationType,
+          subtype: payload.subtype,
+          notification_uuid: payload.notificationUUID,
+          decoded_payload: modifiedPayload,
+          decoded_transaction_info: decodedTransactionInfo,
+          original_transaction_id: decodedTransactionInfo?.originalTransactionId || decodedTransactionInfo?.transactionId,
+          transaction_id: decodedTransactionInfo?.transactionId,
+          product_id: decodedTransactionInfo?.productId,
+          consumption_request_reason: consumptionRequestReason,
+          deadline: deadline,
+          environment: environment,
+          processing_status: 'received'
+        })
+        .select()
+        .single()
+      
+      if (consumptionError) {
+        console.error(`[${requestId}] ERROR storing consumption request webhook:`, consumptionError)
+        // Don't throw here, continue with normal processing
+      } else {
+        console.log(`[${requestId}] ✓ Consumption request webhook stored with ID: ${consumptionWebhook.id}`)
+      }
+    }
+    
     // Store raw notification with decoded transaction info
     console.log(`[${requestId}] Storing raw notification in database...`)
     const { data: notification, error: notificationError } = await supabase
@@ -193,6 +239,17 @@ serve(async (req) => {
 
     console.log(`[${requestId}] ✓ Notification stored successfully`)
     console.log(`[${requestId}] Notification ID: ${notification.id}`)
+    
+    // Update consumption request webhook with notification_raw_id if it was a CONSUMPTION_REQUEST
+    if (payload.notificationType === 'CONSUMPTION_REQUEST') {
+      await supabase
+        .from('consumption_request_webhooks')
+        .update({
+          notification_raw_id: notification.id,
+          processing_status: 'stored'
+        })
+        .eq('request_id', requestId)
+    }
 
     // Trigger asynchronous processing of the notification
     console.log(`[${requestId}] Triggering notification processing...`)

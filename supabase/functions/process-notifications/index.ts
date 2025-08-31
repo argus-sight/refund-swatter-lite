@@ -143,7 +143,7 @@ async function processNotification(supabase: any, notification: any) {
       break
 
     case 'CONSUMPTION_REQUEST':
-      await processConsumptionRequest(supabase, notification, decoded_payload.data, environment)
+      await processConsumptionRequest(supabase, notification, transactionInfo, decoded_payload.data, environment)
       break
 
     case 'SUBSCRIBED':
@@ -242,8 +242,18 @@ async function processRefund(supabase: any, notification: any, transactionInfo: 
   if (error) throw new Error(`Failed to process refund: ${error.message}`)
 }
 
-async function processConsumptionRequest(supabase: any, notification: any, data: any, environment: string) {
-  const originalTransactionId = data.consumptionRequestReason?.originalTransactionId || data.originalTransactionId
+async function processConsumptionRequest(supabase: any, notification: any, transactionInfo: any, data: any, environment: string) {
+  // Get originalTransactionId from transactionInfo (decoded signedTransactionInfo)
+  // For consumption requests, originalTransactionId must come from the transaction being consumed
+  const originalTransactionId = transactionInfo?.originalTransactionId || transactionInfo?.transactionId
+  
+  // Validate that we have an originalTransactionId
+  if (!originalTransactionId) {
+    throw new Error('Missing originalTransactionId in CONSUMPTION_REQUEST notification')
+  }
+  
+  console.log(`Processing CONSUMPTION_REQUEST for transaction: ${originalTransactionId}`)
+  console.log(`Reason: ${data.consumptionRequestReason?.reason || 'Not specified'}`)
   
   const consumptionData = {
     notification_id: notification.id,
@@ -265,6 +275,19 @@ async function processConsumptionRequest(supabase: any, notification: any, data:
     .single()
 
   if (insertError) throw new Error(`Failed to create consumption request: ${insertError.message}`)
+  
+  // Update consumption_request_webhooks table with the consumption_request_id
+  if (notification.notification_uuid) {
+    console.log(`Updating consumption_request_webhooks with consumption_request_id: ${consumptionRequest.id}`)
+    await supabase
+      .from('consumption_request_webhooks')
+      .update({
+        consumption_request_id: consumptionRequest.id,
+        processing_status: 'processed',
+        updated_at: new Date().toISOString()
+      })
+      .eq('notification_uuid', notification.notification_uuid)
+  }
 
   // Calculate consumption data using the database function
   const { data: calculatedData, error: calcError } = await supabase
