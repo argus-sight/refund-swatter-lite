@@ -1,31 +1,20 @@
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { AppleEnvironment, normalizeEnvironment, NotificationStatus } from '../_shared/constants.ts'
-import { verifyAuth, handleCors, getCorsHeaders } from '../_shared/auth.ts'
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
-interface ProcessOptions {
-  limit?: number
-  notificationType?: string
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+function getCorsHeaders() {
+  return corsHeaders
+}
+
+
 serve(async (req) => {
-  // Handle CORS preflight
-  const corsResponse = handleCors(req)
-  if (corsResponse) {
-    return corsResponse
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: getCorsHeaders() })
   }
-
-  // Verify authentication - allow both service role and admin users
-  const auth = await verifyAuth(req, {
-    allowServiceRole: true,
-    requireAdmin: true
-  })
-
-  if (!auth.isValid) {
-    return auth.errorResponse!
-  }
-
-  console.log(`Authenticated: ${auth.isServiceRole ? 'Service Role' : `User ${auth.user?.email}`}`)
 
   try {
     // Create Supabase client
@@ -34,15 +23,30 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     // Parse request options
-    const options: ProcessOptions = req.method === 'POST' ? await req.json() : {}
-    const limit = options.limit || 50
-    const notificationType = options.notificationType
+    const url = new URL(req.url)
+    const pathSegments = url.pathname.split('/').filter(Boolean)
+    const isInvocationPath = pathSegments[pathSegments.length - 1] === 'process-notifications'
+    
+    if (!isInvocationPath) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid path' }),
+        { 
+          status: 404,
+          headers: { ...getCorsHeaders(), 'Content-Type': 'application/json' },
+        }
+      )
+    }
+
+    // Check for specific notification types in query params
+    const notificationType = url.searchParams.get('notificationType')
+    const notificationId = url.searchParams.get('notificationId')
+    const limit = parseInt(url.searchParams.get('limit') || '50')
 
     // Query pending notifications
     let query = supabase
       .from('notifications_raw')
       .select('*')
-      .eq('status', NotificationStatus.PENDING)
+      .in('status', ['pending', 'failed'])
       .order('received_at', { ascending: true })
       .limit(limit)
 
@@ -50,10 +54,23 @@ serve(async (req) => {
       query = query.eq('notification_type', notificationType)
     }
 
+    if (notificationId) {
+      query = query.eq('id', notificationId)
+    }
+
+    console.log('Processing notifications:', { notificationType, notificationId, limit })
+
     const { data: notifications, error: fetchError } = await query
 
     if (fetchError) {
-      throw new Error(`Failed to fetch notifications: ${fetchError.message}`)
+      console.error('Error fetching notifications:', fetchError)
+      return new Response(
+        JSON.stringify({ error: 'Failed to fetch notifications', details: fetchError.message }),
+        { 
+          status: 500,
+          headers: { ...getCorsHeaders(), 'Content-Type': 'application/json' },
+        }
+      )
     }
 
     if (!notifications || notifications.length === 0) {
@@ -84,7 +101,7 @@ serve(async (req) => {
         const { error: updateError } = await supabase
           .from('notifications_raw')
           .update({ 
-            status: NotificationStatus.PROCESSED,
+            status: 'processed',
             processed_at: new Date().toISOString()
           })
           .eq('id', notification.id)
@@ -99,7 +116,7 @@ serve(async (req) => {
         await supabase
           .from('notifications_raw')
           .update({ 
-            status: NotificationStatus.FAILED,
+            status: 'failed',
             error_message: error.message
           })
           .eq('id', notification.id)
@@ -156,7 +173,7 @@ async function processNotification(supabase: any, notification: any) {
       break
 
     case 'SUBSCRIBED':
-      await processSubscribed(supabase, notification, transactionInfo, subtype, environment)
+      await processSubscribed(supabase, transactionInfo, subtype, environment)
       break
 
     case 'DID_RENEW':
@@ -367,7 +384,7 @@ async function processConsumptionRequest(supabase: any, notification: any, trans
   }
 }
 
-async function processSubscribed(supabase: any, notification: any, transactionInfo: any, subtype: string, environment: string) {
+async function processSubscribed(supabase: any, transactionInfo: any, subtype: string, environment: string) {
   if (!transactionInfo) return
 
   // For initial subscriptions, originalTransactionId might be null or same as transactionId
@@ -401,12 +418,12 @@ async function processSubscribed(supabase: any, notification: any, transactionIn
 
 async function processRenewal(supabase: any, notification: any, transactionInfo: any, subtype: string, environment: string) {
   // Same as processSubscribed for renewals
-  await processSubscribed(supabase, notification, transactionInfo, subtype, environment)
+  await processSubscribed(supabase, transactionInfo, subtype, environment)
 }
 
 async function processOneTimeCharge(supabase: any, notification: any, transactionInfo: any, environment: string) {
   // Same as processSubscribed for one-time purchases
-  await processSubscribed(supabase, notification, transactionInfo, null, environment)
+  await processSubscribed(supabase, transactionInfo, null, environment)
 }
 
 async function processRenewalStatusChange(supabase: any, notification: any, transactionInfo: any, subtype: string, environment: string) {
@@ -483,7 +500,7 @@ async function processRenewalPrefChange(supabase: any, notification: any, transa
 
 async function processOfferRedeemed(supabase: any, notification: any, transactionInfo: any, subtype: string, environment: string) {
   // Process offer redemption
-  await processSubscribed(supabase, notification, transactionInfo, subtype, environment)
+  await processSubscribed(supabase, transactionInfo, subtype, environment)
 }
 
 async function processPriceIncrease(supabase: any, notification: any, transactionInfo: any, subtype: string) {

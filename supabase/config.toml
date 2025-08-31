@@ -41,6 +41,7 @@ verify_jwt = false
 
 [functions.process-notifications]
 verify_jwt = false
+import_map = "./functions/import_map.json"
 
 [functions.process-notifications-cron]
 verify_jwt = false
