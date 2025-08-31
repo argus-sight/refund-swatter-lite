@@ -10,6 +10,7 @@ import NotificationHistory from './tools/NotificationHistory'
 import RefundHistory from './tools/RefundHistory'
 import TransactionHistory from './tools/TransactionHistory'
 import ConsumptionRequestHistory from './tools/ConsumptionRequestHistory'
+import ManualReprocess from './tools/ManualReprocess'
 import { 
   Cog6ToothIcon, 
   DocumentTextIcon, 
@@ -18,7 +19,8 @@ import {
   ClockIcon,
   CurrencyDollarIcon,
   ChartBarIcon,
-  PaperAirplaneIcon
+  PaperAirplaneIcon,
+  ArrowUturnLeftIcon
 } from '@heroicons/react/24/outline'
 
 export default function Dashboard() {
@@ -122,6 +124,7 @@ export default function Dashboard() {
     { id: 'consumption-requests', name: 'Consumption Requests', icon: PaperAirplaneIcon },
     { id: 'refund-history', name: 'Refund History', icon: ArrowPathIcon },
     { id: 'transaction-history', name: 'Transaction History', icon: CurrencyDollarIcon },
+    { id: 'manual-reprocess', name: 'Manual Reprocess', icon: ArrowUturnLeftIcon },
     { id: 'settings', name: 'Settings', icon: Cog6ToothIcon },
   ]
 
@@ -239,6 +242,10 @@ export default function Dashboard() {
 
         {activeTab === 'transaction-history' && (
           <TransactionHistory environment={environment} />
+        )}
+
+        {activeTab === 'manual-reprocess' && (
+          <ManualReprocess environment={environment} />
         )}
 
         {activeTab === 'settings' && (
