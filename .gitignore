@@ -6,6 +6,7 @@ web/.next/
 .claude
 CLAUDE.md
 
+node_modules/
 web/node_modules/
 .next/
 out/

@@ -10,7 +10,18 @@
     "dev": "cd web && npm run dev",
     "setup": "./setup.sh"
   },
-  "keywords": ["apple", "app-store", "refund", "consumption"],
+  "keywords": [
+    "apple",
+    "app-store",
+    "refund",
+    "consumption"
+  ],
   "author": "",
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.56.1",
+    "@types/jsonwebtoken": "^9.0.10",
+    "jsonwebtoken": "^9.0.2",
+    "tsx": "^4.20.5"
+  }
 }

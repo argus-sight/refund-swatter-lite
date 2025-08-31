@@ -57,7 +57,8 @@ async function sendConsumptionToApple(
   
   try {
     // Select the correct Apple API base URL based on environment
-    const apiBase = environment === 'sandbox' ? APPLE_API_BASE_SANDBOX : APPLE_API_BASE_PRODUCTION
+    // Note: environment from DB is 'Sandbox' with capital S
+    const apiBase = environment?.toLowerCase() === 'sandbox' ? APPLE_API_BASE_SANDBOX : APPLE_API_BASE_PRODUCTION
     const url = `${apiBase}/transactions/consumption/${originalTransactionId}`
     const requestHeaders = {
       'Authorization': `Bearer ${jwt}`,
