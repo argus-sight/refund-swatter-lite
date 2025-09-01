@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Refund Swatter Lite - Interactive Setup & Deployment Script
-# Simplified one-click deployment with minimal user input
+# Refund Swatter Lite - Simplified Setup & Deployment Script
+# Single configuration source: .env.project
 
 set -e
 
@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}============================================${NC}"
-echo -e "${BLUE}  Refund Swatter Lite - Quick Setup        ${NC}"
+echo -e "${BLUE}  Refund Swatter Lite - One-Click Setup    ${NC}"
 echo -e "${BLUE}============================================${NC}"
 echo ""
 
@@ -27,191 +27,146 @@ if ! command -v supabase &> /dev/null; then
     exit 1
 fi
 
-# Function to validate project ref format
-validate_project_ref() {
-    if [[ ! $1 =~ ^[a-z]{20}$ ]]; then
-        echo -e "${RED}Invalid project reference format.${NC}"
-        echo "Project reference should be 20 lowercase letters (e.g., dmyhbzzrpjfbevehpwkp)"
-        return 1
-    fi
-    return 0
-}
-
-# Function to extract project ref from URL
-extract_project_ref() {
-    if [[ $1 =~ https://([a-z]{20})\.supabase\.co ]]; then
-        echo "${BASH_REMATCH[1]}"
-        return 0
-    fi
-    return 1
-}
-
-# Check if already configured
-if [ -f .env ] && [ -f supabase/config.toml ]; then
-    PROJECT_ID=$(grep "project_id" supabase/config.toml 2>/dev/null | cut -d '"' -f 2)
-    if [ ! -z "$PROJECT_ID" ]; then
-        echo -e "${GREEN}Existing configuration detected!${NC}"
-        echo "Project ID: $PROJECT_ID"
-        read -p "Do you want to use the existing configuration? (Y/n): " -n 1 -r USE_EXISTING
-        echo ""
-        if [[ ! $USE_EXISTING =~ ^[Nn]$ ]]; then
-            # Load existing config
-            if [ -f .env ]; then
-                source .env
-                SKIP_INPUT=true
-            fi
-        fi
-    fi
-fi
-
-# Interactive input for minimal configuration
-if [ "$SKIP_INPUT" != "true" ]; then
-    echo -e "${YELLOW}Step 1: Project Configuration${NC}"
-    echo "--------------------------------"
-    
-    # Get project reference
-    while true; do
-        echo "Enter your Supabase project reference or URL:"
-        echo "(You can find this in Supabase Dashboard > Settings > General)"
-        read -r PROJECT_INPUT
-        
-        # Check if it's a URL or direct project ref
-        if [[ $PROJECT_INPUT =~ ^https:// ]]; then
-            PROJECT_REF=$(extract_project_ref "$PROJECT_INPUT")
-            if [ $? -eq 0 ]; then
-                echo -e "${GREEN}✓ Extracted project reference: $PROJECT_REF${NC}"
-                break
-            else
-                echo -e "${RED}Could not extract project reference from URL${NC}"
-            fi
-        else
-            PROJECT_REF=$PROJECT_INPUT
-            if validate_project_ref "$PROJECT_REF"; then
-                echo -e "${GREEN}✓ Valid project reference${NC}"
-                break
-            fi
-        fi
-    done
-    
-    PROJECT_ID=$PROJECT_REF
-fi
-
-echo ""
-echo -e "${YELLOW}Step 2: Linking to Supabase Project${NC}"
-echo "------------------------------------"
-
-# Link to Supabase project - use interactive mode for password
-echo "Linking to project: $PROJECT_ID"
-echo -e "${YELLOW}Please enter your database password when prompted:${NC}"
-
-# Try with https DNS resolver to avoid Docker network issues
-supabase link --project-ref $PROJECT_ID --dns-resolver https
-
-if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✓ Successfully linked to project${NC}"
-else
-    echo -e "${RED}Failed to link to project. Please check your credentials.${NC}"
+# Check if configuration file exists
+if [ ! -f ".env.project" ]; then
+    echo -e "${RED}Error: Configuration file .env.project not found!${NC}"
+    echo ""
+    echo "Please create it by copying the example:"
+    echo -e "${GREEN}cp .env.project.example .env.project${NC}"
+    echo "Then edit .env.project with your Supabase project details."
     exit 1
 fi
 
-# Get configuration from Supabase
+# Load configuration
+echo -e "${YELLOW}Loading configuration...${NC}"
+source .env.project
+
+# Validate required variables
+if [ -z "$SUPABASE_PROJECT_REF" ] || [ "$SUPABASE_PROJECT_REF" = "your-project-ref-here" ]; then
+    echo -e "${RED}Error: SUPABASE_PROJECT_REF not configured in .env.project${NC}"
+    echo "Please edit .env.project and add your Supabase project reference."
+    exit 1
+fi
+
+if [ -z "$SUPABASE_DB_PASSWORD" ] || [ "$SUPABASE_DB_PASSWORD" = "your-database-password-here" ]; then
+    echo -e "${RED}Error: SUPABASE_DB_PASSWORD not configured in .env.project${NC}"
+    echo "Please edit .env.project and add your database password."
+    exit 1
+fi
+
+echo -e "${GREEN}✓ Configuration loaded${NC}"
+echo "  Project: $SUPABASE_PROJECT_REF"
+echo "  Environment: ${ENVIRONMENT:-production}"
 echo ""
-echo -e "${YELLOW}Step 3: Retrieving Project Configuration${NC}"
-echo "-----------------------------------------"
 
-# For remote projects, we need to get the keys differently
-# Try using supabase gen keys with experimental flag
-KEYS_JSON=$(supabase gen keys --experimental --project-ref $PROJECT_ID --output json 2>/dev/null)
+# Step 1: Link Supabase project (if not already linked)
+echo -e "${YELLOW}Step 1: Linking Supabase project${NC}"
+echo "----------------------------------------"
 
-if [ $? -eq 0 ] && [ ! -z "$KEYS_JSON" ]; then
-    # Extract keys from JSON output
-    ANON_KEY=$(echo "$KEYS_JSON" | grep -o '"SUPABASE_AUTH_ANON_KEY":"[^"]*' | cut -d'"' -f4)
-    SERVICE_ROLE_KEY=$(echo "$KEYS_JSON" | grep -o '"SUPABASE_AUTH_SERVICE_ROLE_KEY":"[^"]*' | cut -d'"' -f4)
-    API_URL="https://$PROJECT_ID.supabase.co"
-    
-    if [ ! -z "$ANON_KEY" ] && [ ! -z "$SERVICE_ROLE_KEY" ]; then
-        echo -e "${GREEN}✓ Retrieved project configuration${NC}"
+if [ ! -f "supabase/.temp/project-ref" ]; then
+    echo "Linking to project $SUPABASE_PROJECT_REF..."
+    if supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD" 2>/dev/null; then
+        echo -e "${GREEN}✓ Project linked successfully${NC}"
     else
-        echo -e "${RED}Failed to extract keys from response${NC}"
-        echo "Please ensure you have proper access to this project."
-        exit 1
+        echo -e "${YELLOW}⚠ Project might already be linked or password incorrect${NC}"
+        echo "Attempting to continue with existing link..."
     fi
 else
-    echo -e "${YELLOW}Could not retrieve keys automatically.${NC}"
-    echo ""
-    echo "Please get your project keys from the Supabase Dashboard:"
-    echo "1. Go to: https://supabase.com/dashboard/project/$PROJECT_ID/settings/api"
-    echo "2. Copy the 'anon' key and 'service_role' key"
-    echo ""
-    read -p "Enter your project's anon key: " ANON_KEY
-    read -p "Enter your project's service_role key: " SERVICE_ROLE_KEY
-    API_URL="https://$PROJECT_ID.supabase.co"
-    
-    if [ ! -z "$ANON_KEY" ] && [ ! -z "$SERVICE_ROLE_KEY" ]; then
-        echo -e "${GREEN}✓ Keys configured${NC}"
+    LINKED_PROJECT=$(cat supabase/.temp/project-ref 2>/dev/null || echo "")
+    if [ "$LINKED_PROJECT" = "$SUPABASE_PROJECT_REF" ]; then
+        echo -e "${GREEN}✓ Project already linked${NC}"
     else
-        echo -e "${RED}Keys are required to continue${NC}"
-        exit 1
+        echo -e "${YELLOW}⚠ Different project currently linked${NC}"
+        echo "Unlinking and relinking to $SUPABASE_PROJECT_REF..."
+        rm -rf supabase/.temp
+        supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+        echo -e "${GREEN}✓ Project relinked successfully${NC}"
     fi
+fi
+
+# Step 2: Get project configuration
+echo ""
+echo -e "${YELLOW}Step 2: Retrieving project configuration${NC}"
+echo "----------------------------------------"
+
+# Get keys using Supabase CLI
+SUPABASE_STATUS=$(supabase status --output json 2>/dev/null)
+if [ $? -eq 0 ]; then
+    ANON_KEY=$(echo "$SUPABASE_STATUS" | grep -o '"anon_key":"[^"]*' | cut -d'"' -f4)
+    SERVICE_ROLE_KEY=$(echo "$SUPABASE_STATUS" | grep -o '"service_role_key":"[^"]*' | cut -d'"' -f4)
+    API_URL="https://$SUPABASE_PROJECT_REF.supabase.co"
+    
+    echo -e "${GREEN}✓ Retrieved project keys${NC}"
+else
+    echo -e "${RED}Failed to retrieve project configuration${NC}"
+    echo "Please check your project reference and password."
+    exit 1
 fi
 
 # Generate CRON_SECRET if not exists
-if [ -z "$CRON_SECRET" ]; then
-    CRON_SECRET=$(openssl rand -hex 32)
-    echo -e "${GREEN}✓ Generated CRON_SECRET${NC}"
-fi
+CRON_SECRET=$(openssl rand -hex 32)
 
-# Save configuration to .env
+# Step 3: Generate environment files for web app
 echo ""
-echo -e "${YELLOW}Step 4: Saving Configuration${NC}"
-echo "-----------------------------"
+echo -e "${YELLOW}Step 3: Generating environment files${NC}"
+echo "----------------------------------------"
 
+# Create root .env for compatibility
 cat > .env << EOF
+# Auto-generated from .env.project - DO NOT EDIT DIRECTLY
+# Edit .env.project and run setup.sh to update
+
 # Supabase Configuration
 NEXT_PUBLIC_SUPABASE_URL=$API_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY
-SUPABASE_PROJECT_REF=$PROJECT_ID
+SUPABASE_PROJECT_REF=$SUPABASE_PROJECT_REF
 
 # Cron Secret
 CRON_SECRET=$CRON_SECRET
 
 # Next.js
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
-EOF
 
-echo -e "${GREEN}✓ Configuration saved to .env${NC}"
+# Apple Configuration
+APPLE_BUNDLE_ID=$APPLE_BUNDLE_ID
+EOF
 
 # Create web/.env if web directory exists
 if [ -d "web" ]; then
-    cat > web/.env << EOF
-# Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL=$API_URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY
-SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY
-
-# Cron Secret
-CRON_SECRET=$CRON_SECRET
-
-# Next.js
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
-EOF
-    echo -e "${GREEN}✓ Configuration saved to web/.env${NC}"
+    cp .env web/.env
+    echo -e "${GREEN}✓ Generated web/.env${NC}"
 fi
 
-# Create temp directory if needed for project reference
-mkdir -p supabase/.temp
-echo "$PROJECT_ID" > supabase/.temp/project-ref
+echo -e "${GREEN}✓ Environment files generated${NC}"
 
-# Database migrations
+# Step 4: Apply database migrations
 echo ""
-echo -e "${YELLOW}Step 5: Applying Database Migrations${NC}"
-echo "-------------------------------------"
+echo -e "${YELLOW}Step 4: Applying database migrations${NC}"
+echo "----------------------------------------"
 
-supabase db push
+if [ "$AUTO_CONFIRM" = "true" ]; then
+    PUSH_FLAGS=""
+else
+    PUSH_FLAGS="--dry-run"
+    echo "Running in dry-run mode. Set AUTO_CONFIRM=true in .env.project to apply changes."
+fi
 
-if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✓ Database migrations applied successfully${NC}"
+if supabase db push $PUSH_FLAGS; then
+    if [ "$AUTO_CONFIRM" = "true" ]; then
+        echo -e "${GREEN}✓ Database migrations applied${NC}"
+    else
+        echo -e "${YELLOW}Dry run completed. To apply changes, either:${NC}"
+        echo "  1. Set AUTO_CONFIRM=true in .env.project and run setup.sh again"
+        echo "  2. Run: supabase db push"
+        echo ""
+        read -p "Apply migrations now? (y/N): " -n 1 -r
+        echo ""
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            supabase db push
+            echo -e "${GREEN}✓ Database migrations applied${NC}"
+        fi
+    fi
 else
     echo -e "${RED}Failed to apply database migrations${NC}"
     echo ""
@@ -220,59 +175,81 @@ else
     echo "   - pg_cron"
     echo "   - vault"
     echo "   - pg_net"
-    echo "2. Go to: https://supabase.com/dashboard/project/$PROJECT_ID/database/extensions"
+    echo "2. Go to: https://supabase.com/dashboard/project/$SUPABASE_PROJECT_REF/database/extensions"
     exit 1
 fi
 
-# Set secrets
+# Step 5: Set secrets
 echo ""
-echo -e "${YELLOW}Step 6: Setting Up Secrets${NC}"
-echo "---------------------------"
+echo -e "${YELLOW}Step 5: Setting up secrets${NC}"
+echo "----------------------------------------"
 
-supabase secrets set CRON_SECRET=$CRON_SECRET
-echo -e "${GREEN}✓ Secrets configured${NC}"
+supabase secrets set CRON_SECRET="$CRON_SECRET" 2>/dev/null || true
 
-# Deploy Edge Functions
-echo ""
-echo -e "${YELLOW}Step 7: Deploying Edge Functions${NC}"
-echo "---------------------------------"
-
-FUNCTIONS=(
-    "webhook"
-    "send-consumption"
-    "apple-jwt"
-    "data-initialization"
-    "process-jobs"
-    "apple-notification-history"
-    "process-notifications"
-    "process-notifications-cron"
-)
-
-DEPLOY_FAILED=0
-for func in "${FUNCTIONS[@]}"; do
-    echo -n "  Deploying $func..."
-    if supabase functions deploy $func --no-verify-jwt > /dev/null 2>&1; then
-        echo -e " ${GREEN}✓${NC}"
-    else
-        echo -e " ${RED}✗${NC}"
-        DEPLOY_FAILED=1
-    fi
-done
-
-if [ $DEPLOY_FAILED -eq 0 ]; then
-    echo -e "${GREEN}✓ All Edge Functions deployed successfully${NC}"
-else
-    echo -e "${YELLOW}⚠ Some Edge Functions failed to deploy${NC}"
-    echo "You can retry individual functions with: supabase functions deploy <function-name>"
+# Set Apple secrets if provided
+if [ ! -z "$APPLE_KEY_ID" ] && [ "$APPLE_KEY_ID" != "your-key-id" ]; then
+    supabase secrets set APPLE_KEY_ID="$APPLE_KEY_ID" 2>/dev/null || true
 fi
 
-# Setup cron job via SQL
-echo ""
-echo -e "${YELLOW}Step 8: Setting Up Cron Jobs${NC}"
-echo "-----------------------------"
+if [ ! -z "$APPLE_ISSUER_ID" ] && [ "$APPLE_ISSUER_ID" != "your-issuer-id" ]; then
+    supabase secrets set APPLE_ISSUER_ID="$APPLE_ISSUER_ID" 2>/dev/null || true
+fi
 
-# Create cron job using the project configuration
-CRON_SQL="
+if [ ! -z "$APPLE_TEAM_ID" ] && [ "$APPLE_TEAM_ID" != "your-team-id" ]; then
+    supabase secrets set APPLE_TEAM_ID="$APPLE_TEAM_ID" 2>/dev/null || true
+fi
+
+echo -e "${GREEN}✓ Secrets configured${NC}"
+
+# Step 6: Deploy Edge Functions (if enabled)
+if [ "$DEPLOY_FUNCTIONS" = "true" ]; then
+    echo ""
+    echo -e "${YELLOW}Step 6: Deploying Edge Functions${NC}"
+    echo "----------------------------------------"
+    
+    FUNCTIONS=(
+        "webhook"
+        "send-consumption"
+        "apple-jwt"
+        "data-initialization"
+        "process-jobs"
+        "apple-notification-history"
+        "process-notifications"
+        "process-notifications-cron"
+        "reprocess-notification"
+        "setup-admin"
+    )
+    
+    DEPLOY_FAILED=0
+    for func in "${FUNCTIONS[@]}"; do
+        echo -n "  Deploying $func..."
+        if supabase functions deploy "$func" --no-verify-jwt > /dev/null 2>&1; then
+            echo -e " ${GREEN}✓${NC}"
+        else
+            echo -e " ${RED}✗${NC}"
+            DEPLOY_FAILED=1
+        fi
+    done
+    
+    if [ $DEPLOY_FAILED -eq 0 ]; then
+        echo -e "${GREEN}✓ All Edge Functions deployed successfully${NC}"
+    else
+        echo -e "${YELLOW}⚠ Some Edge Functions failed to deploy${NC}"
+        echo "You can retry individual functions with: supabase functions deploy <function-name>"
+    fi
+else
+    echo ""
+    echo -e "${YELLOW}Skipping Edge Functions deployment (DEPLOY_FUNCTIONS=false)${NC}"
+fi
+
+# Step 7: Setup cron jobs (if enabled)
+if [ "$SETUP_CRON" = "true" ]; then
+    echo ""
+    echo -e "${YELLOW}Step 7: Setting up cron jobs${NC}"
+    echo "----------------------------------------"
+    
+    # Create cron job using the project configuration
+    CRON_SQL="
 -- Unschedule existing job if exists
 SELECT cron.unschedule('process-pending-notifications') 
 WHERE EXISTS (
@@ -299,39 +276,39 @@ SELECT cron.schedule(
     \$\$
 );
 "
-
-echo "$CRON_SQL" | supabase db execute
-
-if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✓ Cron jobs configured${NC}"
+    
+    echo "$CRON_SQL" | supabase db execute 2>/dev/null
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Cron jobs configured${NC}"
+    else
+        echo -e "${YELLOW}⚠ Cron job setup may need manual configuration${NC}"
+        echo "Please ensure pg_cron extension is enabled in your Supabase project."
+    fi
 else
-    echo -e "${YELLOW}⚠ Cron job setup may need manual configuration${NC}"
+    echo ""
+    echo -e "${YELLOW}Skipping cron job setup (SETUP_CRON=false)${NC}"
 fi
 
-# Optional: Web application setup
+# Step 8: Setup default admin user
 echo ""
-read -p "Do you want to setup the web dashboard for local development? (y/N): " -n 1 -r
-echo ""
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    if [ -d "web" ]; then
-        echo -e "${YELLOW}Setting up web application...${NC}"
-        cd web
-        
-        # Install dependencies
-        echo "Installing dependencies..."
-        npm install
-        
-        # Build application
-        echo "Building application..."
-        npm run build
-        
-        cd ..
-        echo -e "${GREEN}✓ Web application setup complete${NC}"
-        echo ""
-        echo "To start the dashboard locally:"
-        echo "  cd web && npm run dev"
-        echo "Then access: http://localhost:3000"
-    fi
+echo -e "${YELLOW}Step 8: Setting up admin user${NC}"
+echo "----------------------------------------"
+
+echo "Creating default admin user..."
+response=$(curl -s -X POST \
+  "${API_URL}/functions/v1/setup-admin" \
+  -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" \
+  -H "Content-Type: application/json" 2>/dev/null)
+
+if echo "$response" | grep -q '"email"' 2>/dev/null; then
+  echo -e "${GREEN}✓ Admin user created${NC}"
+  echo "  Email: admin@refundswatter.com"
+  echo "  Password: ChangeMe123!"
+elif echo "$response" | grep -q "already exists" 2>/dev/null; then
+  echo -e "${GREEN}✓ Admin user already exists${NC}"
+else
+  echo -e "${YELLOW}⚠ Could not create admin user (may already exist)${NC}"
 fi
 
 # Final summary
@@ -342,7 +319,15 @@ echo -e "${GREEN}============================================${NC}"
 echo ""
 echo -e "${BLUE}Project Details:${NC}"
 echo "  Project URL: $API_URL"
-echo "  Dashboard: https://supabase.com/dashboard/project/$PROJECT_ID"
+echo "  Dashboard: https://supabase.com/dashboard/project/$SUPABASE_PROJECT_REF"
+echo ""
+
+if [ "$DEPLOY_FUNCTIONS" = "true" ] && [ "$SETUP_CRON" = "true" ]; then
+    echo -e "${GREEN}✓ All components deployed and configured${NC}"
+else
+    echo -e "${YELLOW}Note: Some components were skipped based on your configuration${NC}"
+fi
+
 echo ""
 echo -e "${YELLOW}Important Next Steps:${NC}"
 echo ""
@@ -351,14 +336,21 @@ echo "   Settings > Edge Functions > Environment Variables"
 echo "   - APPLE_PRIVATE_KEY (your .p8 file content)"
 echo "   - APPLE_KEY_ID"
 echo "   - APPLE_ISSUER_ID"
-echo "   - APPLE_BUNDLE_ID"
+echo "   - APPLE_BUNDLE_ID (if different from config)"
 echo ""
 echo "2. Configure Apple App Store Server Notifications:"
 echo "   URL: $API_URL/functions/v1/webhook"
 echo ""
-echo "3. Monitor your deployment:"
-echo "   - Cron Jobs: https://supabase.com/dashboard/project/$PROJECT_ID/integrations/cron"
-echo "   - Edge Functions: https://supabase.com/dashboard/project/$PROJECT_ID/functions"
-echo "   - Database: https://supabase.com/dashboard/project/$PROJECT_ID/database/tables"
+echo "3. Start the web interface:"
+echo "   cd web && npm install && npm run dev"
+echo ""
+echo "4. Login with admin credentials:"
+echo "   URL: http://localhost:3000/login"
+echo "   Email: admin@refundswatter.com"
+echo "   Password: ChangeMe123!"
+echo ""
+echo -e "${BLUE}Configuration:${NC}"
+echo "  All settings are in: .env.project"
+echo "  To reconfigure: edit .env.project and run ./setup.sh again"
 echo ""
 echo -e "${GREEN}Your project is ready to use!${NC}"

@@ -1,6 +1,7 @@
 # Supabase project configuration
+# This is a local development configuration - project linking is handled by setup.sh
 
-project_id = "dmyhbzzrpjfbevehpwkp"
+project_id = "refund-swatter-lite"
 
 [api]
 enabled = true

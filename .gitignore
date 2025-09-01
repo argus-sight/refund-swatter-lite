@@ -1,10 +1,18 @@
+# Environment files
 .env
 .env.local
 .env.production
-web/.next/
+.env.project
+!.env.project.example
+web/.env
+
+# IDE and local settings
 .mcp.json
 .claude
 CLAUDE.md
+
+# Next.js
+web/.next/
 
 node_modules/
 web/node_modules/
@@ -17,3 +25,5 @@ volumes/
 
 # Supabase temporary files
 supabase/.temp/
+supabase/.branches
+supabase/.env
