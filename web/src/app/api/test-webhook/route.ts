@@ -70,22 +70,49 @@ export async function POST(request: NextRequest) {
 
     // Send test notification request to Apple
     const apiBase = getAppleApiBase(environment as AppleEnvironment)
-    console.log('Sending test notification to Apple:', `${apiBase}/notifications/test`)
-    const response = await fetch(`${apiBase}/notifications/test`, {
+    const apiUrl = `${apiBase}/notifications/test`
+    const requestBody = {
+      bundleId: config.bundle_id
+    }
+    
+    console.log('Sending test notification to Apple:', apiUrl)
+    const startTime = Date.now()
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${jwt}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        bundleId: config.bundle_id
-      })
+      body: JSON.stringify(requestBody)
     })
+    const endTime = Date.now()
 
     console.log('Apple API response status:', response.status)
     console.log('Apple API response headers:', Object.fromEntries(response.headers.entries()))
     const appleResponseText = await response.text()
     console.log('Apple API response body:', appleResponseText || '(empty)')
+    
+    // Log the API request to apple_api_logs table
+    let responseBody = null
+    if (appleResponseText) {
+      try {
+        responseBody = JSON.parse(appleResponseText)
+      } catch (e) {
+        // If response is not JSON, store as text in an object
+        responseBody = { raw: appleResponseText }
+      }
+    }
+    
+    await supabase.from('apple_api_logs').insert({
+      endpoint: apiUrl,
+      method: 'POST',
+      request_body: requestBody,
+      response_status: response.status,
+      response_body: responseBody,
+      response_time_ms: endTime - startTime,
+      environment: environment,
+      notes: 'Test notification request'
+    })
     
     // Handle empty response for 401 errors
     if (response.status === 401) {

@@ -89,18 +89,56 @@ echo ""
 echo -e "${YELLOW}Step 2: Retrieving project configuration${NC}"
 echo "----------------------------------------"
 
-# Get keys using Supabase CLI
-SUPABASE_STATUS=$(supabase status --output json 2>/dev/null)
+# Try to get keys from the project directly (preferred method)
+echo "Fetching keys from remote project..."
+KEYS_OUTPUT=$(supabase projects api-keys --project-ref "$SUPABASE_PROJECT_REF" 2>/dev/null)
 if [ $? -eq 0 ]; then
-    ANON_KEY=$(echo "$SUPABASE_STATUS" | grep -o '"anon_key":"[^"]*' | cut -d'"' -f4)
-    SERVICE_ROLE_KEY=$(echo "$SUPABASE_STATUS" | grep -o '"service_role_key":"[^"]*' | cut -d'"' -f4)
+    ANON_KEY=$(echo "$KEYS_OUTPUT" | grep "anon" | awk '{print $NF}')
+    SERVICE_ROLE_KEY=$(echo "$KEYS_OUTPUT" | grep "service_role" | awk '{print $NF}')
     API_URL="https://$SUPABASE_PROJECT_REF.supabase.co"
-    
-    echo -e "${GREEN}✓ Retrieved project keys${NC}"
+    echo -e "${GREEN}✓ Retrieved project keys from remote${NC}"
 else
-    echo -e "${RED}Failed to retrieve project configuration${NC}"
-    echo "Please check your project reference and password."
-    exit 1
+    # Fallback: Try local status (requires containers running)
+    echo "Trying local status..."
+    SUPABASE_STATUS=$(timeout 5 supabase status --output json 2>/dev/null)
+    if [ $? -eq 0 ]; then
+        ANON_KEY=$(echo "$SUPABASE_STATUS" | grep -o '"anon_key":"[^"]*' | cut -d'"' -f4)
+        SERVICE_ROLE_KEY=$(echo "$SUPABASE_STATUS" | grep -o '"service_role_key":"[^"]*' | cut -d'"' -f4)
+        API_URL="https://$SUPABASE_PROJECT_REF.supabase.co"
+        echo -e "${GREEN}✓ Retrieved project keys from local status${NC}"
+    fi
+fi
+
+# Final fallback: Check for existing keys or prompt user
+if [ -z "$ANON_KEY" ] || [ -z "$SERVICE_ROLE_KEY" ]; then
+    echo -e "${YELLOW}Unable to retrieve keys automatically.${NC}"
+    echo "Please get your keys from:"
+    echo "https://supabase.com/dashboard/project/$SUPABASE_PROJECT_REF/settings/api"
+    echo ""
+    
+    # Check if keys exist in existing .env file
+    if [ -f ".env" ]; then
+        EXISTING_ANON=$(grep "NEXT_PUBLIC_SUPABASE_ANON_KEY" .env | cut -d'=' -f2)
+        EXISTING_SERVICE=$(grep "SUPABASE_SERVICE_ROLE_KEY" .env | cut -d'=' -f2)
+        
+        if [ ! -z "$EXISTING_ANON" ] && [ ! -z "$EXISTING_SERVICE" ]; then
+            echo -e "${YELLOW}Found existing keys in .env file. Using those...${NC}"
+            ANON_KEY=$EXISTING_ANON
+            SERVICE_ROLE_KEY=$EXISTING_SERVICE
+            API_URL="https://$SUPABASE_PROJECT_REF.supabase.co"
+            echo -e "${GREEN}✓ Using existing project keys${NC}"
+        else
+            echo -e "${RED}Error: Could not retrieve API keys.${NC}"
+            echo "Please add them manually to .env.project or ensure you're logged in:"
+            echo "  supabase login"
+            exit 1
+        fi
+    else
+        echo -e "${RED}Error: Could not retrieve API keys.${NC}"
+        echo "Please add them manually to .env.project or ensure you're logged in:"
+        echo "  supabase login"
+        exit 1
+    fi
 fi
 
 # Generate CRON_SECRET if not exists
