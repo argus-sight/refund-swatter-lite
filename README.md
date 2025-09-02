@@ -15,7 +15,7 @@ Refund Swatter Lite is a streamlined version of Refund Swatter designed for sing
 - **Secure Vault Storage** - Private keys stored using Supabase Vault
 - **Environment Support** - Both Sandbox and Production
 - **Apple Tools** - Built-in tools for testing and data management
-- **One-Click Deploy** - Simple setup script
+- **Simple Setup** - One script to configure everything
 
 ## Quick Start
 
@@ -26,178 +26,155 @@ Refund Swatter Lite is a streamlined version of Refund Swatter designed for sing
 - Node.js 16+
 - Supabase CLI
 
-### Required Database Extensions
-
-Before running migrations, you must enable the following extensions in your Supabase dashboard:
-
-1. Go to your [Supabase Dashboard Extensions page](https://supabase.com/dashboard/project/_/database/extensions)
-2. Enable these extensions:
-   - **uuid-ossp** - For UUID generation (usually enabled by default)
-   - **pg_cron** - For scheduled jobs
-   - **vault** - For secure storage of Apple private keys
-
-> **Important**: The migrations will fail if these extensions are not enabled first. Wait about a minute after enabling for them to become available.
-
 ### Installation
 
-1. **Clone and setup**
+1. **Clone and configure**
 ```bash
 git clone <repository>
 cd refund-swatter-lite
+
+# Copy and configure your project settings
+cp .env.project.example .env.project
+# Edit .env.project with your Supabase credentials
 ```
 
-2. **Configure your Supabase project**
-
-Option A: Link to existing project (recommended)
+2. **Run setup script**
 ```bash
-supabase link --project-ref your-project-ref
-```
-
-Option B: Manual configuration
-- Edit `supabase/config.toml` and update the `project_id` with your project reference
-- Update `.env` file with your Supabase credentials
-
-3. **One-Click Setup & Deploy**
-```bash
-./setup.sh
+./setup-simple.sh
 ```
 
 This will:
-- Apply all database migrations
-- Deploy all Edge Functions  
-- Configure cron jobs automatically
-- Optionally initialize sample data
+- Link your Supabase project
+- Apply database migrations
+- Deploy Edge Functions
+- Configure environment files
+- Set up required extensions (pg_cron, pg_net, vault)
+- Create admin user
 
-4. **Configure Apple credentials in Supabase Dashboard**
-- Go to Settings → Edge Functions → Environment Variables
-- Add your Apple credentials (APPLE_PRIVATE_KEY, etc.)
+3. **Configure Apple credentials**
 
-5. **Start the dashboard (optional for local development)**
+Access the web dashboard and add your Apple credentials:
+- Bundle ID
+- Issuer ID (from App Store Connect)
+- Key ID (from App Store Connect)
+- Private Key (.p8 file content)
+
+4. **Set up cron job**
+
+Follow the instructions displayed by the setup script to configure the cron job in Supabase Dashboard, or use the standalone script:
 ```bash
-cd web
-npm run dev
+./scripts/setup-cron.sh
 ```
 
-6. **Access dashboard**
-Open http://localhost:3000 in your browser
-
-## Configuration
-
-### Initial Setup
-
-When you first access the dashboard, you'll be prompted to configure:
-
-1. **Bundle ID** - Your app's bundle identifier
-2. **Issuer ID** - From App Store Connect API Keys
-3. **Key ID** - Your API key identifier  
-4. **Private Key** - The .p8 file content
-5. **Environment** - Sandbox or Production
-
-### Apple Webhook Configuration
+5. **Configure webhook in Apple**
 
 In App Store Connect:
+- Go to Apps → Your App → App Store Server Notifications
+- Set Production URL: `https://your-project.supabase.co/functions/v1/webhook`
+- Set Sandbox URL: `https://your-project.supabase.co/functions/v1/webhook`
+- Enable notification types (especially CONSUMPTION_REQUEST)
 
-1. Go to Apps → Your App → App Store Server Notifications
-2. Set the URL to: `https://your-project.supabase.co/functions/v1/webhook`
-3. Enable notification types (especially CONSUMPTION_REQUEST)
+## Project Structure
 
-### Automatic Cron Job Setup
+```
+refund-swatter-lite/
+├── supabase/           # Supabase configuration
+│   ├── functions/      # Edge Functions
+│   └── migrations/     # Database migrations
+├── web/                # Next.js admin dashboard
+├── scripts/            # Utility scripts
+├── docs/               # Documentation
+└── setup-simple.sh     # Main setup script
+```
 
-The cron job is automatically configured during deployment to process consumption requests every 5 minutes. You can verify the setup in your Supabase Dashboard under Integrations > Cron.
+## Configuration Files
+
+### .env.project
+Main configuration file containing:
+- `SUPABASE_PROJECT_REF` - Your Supabase project reference
+- `SUPABASE_DB_PASSWORD` - Database password
+- `APPLE_BUNDLE_ID` - Your app's bundle ID
+- `DEPLOY_FUNCTIONS` - Whether to deploy Edge Functions
+- `SETUP_CRON` - Whether to set up cron jobs
+
+### Environment Variables
+
+For local development (`.env`):
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+CRON_SECRET=your-random-secret
+```
 
 ## Dashboard Features
 
-### Overview Tab
+### Overview
 - Consumption metrics (last 30 days)
-- Configuration status
-- Success rates and response times
+- Processing statistics
+- System health status
 
-### Notifications Tab
-- View all received notifications
-- Filter by type
-- Check processing status
+### Notifications
+- View all Apple notifications
+- Filter by type and status
+- Manual reprocessing
 
-### Test & Initialize Tab
-- **Test Webhook** - Send test notifications
+### Test & Initialize
+- **Test Webhook** - Verify webhook configuration
 - **Data Initialization** - Import historical data (up to 180 days)
+- **Check Test Status** - Monitor test notification delivery
 
-### Apple Tools
-- **Notification History** - Query Apple's notification history
-- **Refund History** - Get refund details by transaction
-- **Transaction History** - View user transaction history
+### Consumption Requests
+- View all consumption requests
+- Check processing status
+- Retry failed requests
 
-### Settings Tab
-- Webhook URL for App Store Connect
-- Cron job configuration
-- Environment switching
+### Refund History
+- Track refund patterns
+- View refund metrics
+- Analyze user behavior
 
-## Architecture
+### Settings
+- Apple credentials management
+- Environment switching (Sandbox/Production)
+- System configuration
 
-```
-Apple Server Notifications
-         ↓
-    Webhook Function
-    (JWT verification)
-         ↓
-  PostgreSQL Database
-         ↓
-    Cron Job (5 min)
-         ↓
-  Send Consumption Function
-         ↓
-  Apple Send Consumption API
-```
+## API Logging
 
-## Security
+All Apple API interactions are logged in the `apple_api_logs` table for debugging and auditing:
+- Test notification requests
+- Status checks
+- Consumption data submissions
+- Error tracking
 
-- **Private Key Storage**: Encrypted in Supabase Vault using `vault.create_secret()`
-- **JWT Verification**: All Apple notifications verified
-- **Service Role Keys**: Server-side operations only
-- **No Multi-tenant Complexity**: Simplified security model
+## Deployment
 
-## Consumption Fields
+### Vercel Deployment
 
-The system automatically calculates:
+See [docs/vercel-deployment.md](docs/vercel-deployment.md) for detailed instructions.
 
-| Field | Description |
-|-------|-------------|
-| `accountTenure` | Days since first purchase |
-| `appAccountToken` | User identifier |
-| `consumptionStatus` | Content consumption state |
-| `customerConsented` | User consent (default: true) |
-| `deliveryStatus` | Content delivery state |
-| `lifetimeDollarsPurchased` | Total purchases |
-| `lifetimeDollarsRefunded` | Total refunds |
-| `platform` | Platform type (1=Apple) |
-| `playTime` | Usage in minutes |
-| `refundPreference` | Refund tendency |
-| `sampleContentProvided` | Free content (default: false) |
-| `userStatus` | Account status |
+Required environment variables:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `CRON_SECRET`
 
-## API Usage
+### Edge Functions
 
-### Record Usage Metrics
-
-```javascript
-await supabase
-  .from('usage_metrics')
-  .insert({
-    app_account_token: 'user-123',
-    metric_type: 'play_time',
-    metric_value: { total_minutes: 45 }
-  })
+Deploy all functions:
+```bash
+supabase functions deploy --no-verify-jwt
 ```
 
-### Get Consumption Metrics
-
-```javascript
-const { data } = await supabase
-  .rpc('get_consumption_metrics_summary')
+Or deploy individually:
+```bash
+supabase functions deploy webhook --no-verify-jwt
+supabase functions deploy process-notifications-cron --no-verify-jwt
 ```
 
 ## Monitoring
 
-Check system health in Supabase Dashboard:
+### Check System Health
 
 ```sql
 -- Recent consumption requests
@@ -205,54 +182,92 @@ SELECT * FROM consumption_requests
 WHERE created_at > NOW() - INTERVAL '24 hours'
 ORDER BY created_at DESC;
 
--- Job status
+-- Job processing status
 SELECT status, COUNT(*) 
 FROM send_consumption_jobs
 WHERE created_at > NOW() - INTERVAL '24 hours'
 GROUP BY status;
+
+-- API logs
+SELECT * FROM apple_api_logs
+WHERE created_at > NOW() - INTERVAL '24 hours'
+ORDER BY created_at DESC;
+```
+
+### Cron Job Status
+
+```sql
+-- Check cron job configuration
+SELECT * FROM cron.job 
+WHERE jobname = 'process-notifications-cron';
+
+-- View recent cron runs
+SELECT * FROM cron.job_run_details 
+WHERE jobname = 'process-notifications-cron'
+ORDER BY start_time DESC LIMIT 10;
 ```
 
 ## Troubleshooting
 
 ### Webhook not receiving notifications
-- Verify webhook URL in App Store Connect
-- Check Edge Function logs in Supabase Dashboard
+1. Verify webhook URL in App Store Connect
+2. Check Edge Function logs: `supabase functions logs webhook`
+3. Ensure Edge Functions are deployed
 
 ### Consumption data not sending
-- Verify cron job is running
-- Check Apple credentials configuration
-- Review job error messages
+1. Verify cron job is running: `SELECT * FROM cron.job`
+2. Check Apple credentials in config table
+3. Review job errors in `send_consumption_jobs` table
+
+### Build errors on Vercel
+1. Ensure all environment variables are set
+2. Check that variable names match exactly
+3. Redeploy after adding/updating variables
 
 ### Test notification failing
-- Ensure correct environment selected
-- Verify Apple credentials are valid
-- Check bundle ID matches App Store Connect
+1. Ensure correct environment selected
+2. Verify Apple credentials are valid
+3. Check bundle ID matches App Store Connect
+4. Review `apple_api_logs` table for errors
 
-## Environment Variables
+## Security
 
-```bash
-# Required
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+- **Private Key Storage**: Encrypted in Supabase Vault
+- **JWT Verification**: All Apple notifications verified
+- **Service Role Keys**: Never exposed to client
+- **CRON_SECRET**: Protects scheduled job endpoints
 
-# Optional
-SUPABASE_ACCESS_TOKEN=your-access-token  # For Supabase CLI
-CRON_SECRET=your-random-secret          # For cron job security
-```
+## Consumption Fields
 
-## Deployment
+The system automatically calculates all 12 required fields:
 
-### Vercel
+| Field | Description | Calculation |
+|-------|-------------|-------------|
+| `accountTenure` | Days since first purchase | From transaction history |
+| `appAccountToken` | User identifier | From notification |
+| `consumptionStatus` | Content consumption state | Based on usage |
+| `customerConsented` | User consent | Always true |
+| `deliveryStatus` | Content delivery state | Based on purchase |
+| `lifetimeDollarsPurchased` | Total purchases | Sum of transactions |
+| `lifetimeDollarsRefunded` | Total refunds | Sum of refunds |
+| `platform` | Platform type | Always 1 (Apple) |
+| `playTime` | Usage in minutes | From usage metrics |
+| `refundPreference` | Refund tendency | Calculated ratio |
+| `sampleContentProvided` | Free content | Always false |
+| `userStatus` | Account status | Based on activity |
 
-1. Push to GitHub
-2. Import project in Vercel
-3. Set environment variables
-4. Deploy
+## Scripts
 
-### Supabase
+- `setup-simple.sh` - Main setup script
+- `scripts/setup-cron.sh` - Configure cron job independently
+- `scripts/display-cron-config.sh` - Display cron configuration values
 
-Edge Functions are deployed automatically via the setup script.
+## Documentation
+
+- [Quick Start Guide](QUICK_START.md) - Detailed setup instructions
+- [Deployment Guide](DEPLOYMENT.md) - Production deployment
+- [Vercel Deployment](docs/vercel-deployment.md) - Deploy to Vercel
+- [Cron Setup](docs/cron-setup.md) - Configure scheduled jobs
 
 ## Differences from Refund Swatter
 
@@ -266,6 +281,7 @@ Edge Functions are deployed automatically via the setup script.
 | Core functionality | ✅ | ✅ |
 | Apple tools | ✅ | ✅ |
 | Vault storage | ✅ | ✅ |
+| Setup complexity | Complex | Simple |
 
 ## License
 

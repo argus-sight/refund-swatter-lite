@@ -124,32 +124,55 @@ echo -e "${YELLOW}Step 6: Setting secrets...${NC}"
 supabase secrets set CRON_SECRET="$CRON_SECRET" 2>/dev/null || true
 echo -e "${GREEN}✓ Secrets configured${NC}"
 
-# Step 7: Deploy Edge Functions
-if [ "$DEPLOY_FUNCTIONS" = "true" ]; then
+# Step 7: Deploy Edge Functions (Required)
+echo ""
+echo -e "${YELLOW}Step 7: Deploying Edge Functions (All Required)...${NC}"
+echo "This step deploys all necessary Edge Functions for the application to work."
+echo ""
+
+# All required functions
+FUNCTIONS=(
+    "setup-admin"  # Must be first for admin user creation
+    "webhook"
+    "send-consumption"
+    "apple-jwt"
+    "data-initialization"
+    "process-jobs"
+    "apple-notification-history"
+    "process-notifications"
+    "process-notifications-cron"
+    "reprocess-notification"
+)
+
+FAILED_FUNCTIONS=()
+for func in "${FUNCTIONS[@]}"; do
+    echo -n "  Deploying $func..."
+    ERROR_OUTPUT=$(supabase functions deploy "$func" --no-verify-jwt 2>&1)
+    if [ $? -eq 0 ]; then
+        echo -e " ${GREEN}✓${NC}"
+    else
+        echo -e " ${RED}✗ FAILED${NC}"
+        echo -e "    ${RED}Error: $(echo "$ERROR_OUTPUT" | grep -E "Error:|error:" | head -1)${NC}"
+        FAILED_FUNCTIONS+=("$func")
+    fi
+done
+
+# Check if any functions failed
+if [ ${#FAILED_FUNCTIONS[@]} -gt 0 ]; then
     echo ""
-    echo -e "${YELLOW}Step 7: Deploying Edge Functions...${NC}"
-    
-    FUNCTIONS=(
-        "webhook"
-        "send-consumption"
-        "apple-jwt"
-        "data-initialization"
-        "process-jobs"
-        "apple-notification-history"
-        "process-notifications"
-        "process-notifications-cron"
-        "reprocess-notification"
-        "setup-admin"
-    )
-    
-    for func in "${FUNCTIONS[@]}"; do
-        echo -n "  Deploying $func..."
-        if supabase functions deploy "$func" --no-verify-jwt > /dev/null 2>&1; then
-            echo -e " ${GREEN}✓${NC}"
-        else
-            echo -e " ${RED}✗${NC}"
-        fi
+    echo -e "${RED}⚠️  Some functions failed to deploy:${NC}"
+    for func in "${FAILED_FUNCTIONS[@]}"; do
+        echo -e "    ${RED}- $func${NC}"
     done
+    echo ""
+    echo -e "${YELLOW}To retry deployment manually, run:${NC}"
+    for func in "${FAILED_FUNCTIONS[@]}"; do
+        echo "  supabase functions deploy $func --no-verify-jwt"
+    done
+    echo ""
+    echo -e "${YELLOW}Note: The setup will continue, but some features may not work properly.${NC}"
+else
+    echo -e "${GREEN}✓ All Edge Functions deployed successfully${NC}"
 fi
 
 # Step 8: Setup cron job (via Supabase Dashboard)
