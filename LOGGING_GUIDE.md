@@ -44,7 +44,7 @@ Example:
 
 1. **Via Supabase Dashboard:**
    ```
-   https://supabase.com/dashboard/project/ipvtnhiweddairoakwnv/functions
+   https://supabase.com/dashboard/project/<PROJECT-REF>/functions
    ```
    - Click on any function
    - View "Logs" tab
@@ -53,10 +53,10 @@ Example:
 2. **Via Supabase CLI:**
    ```bash
    # Get logs for specific function
-   supabase functions logs webhook --project-ref ipvtnhiweddairoakwnv
+   supabase functions logs webhook --project-ref <PROJECT-REF>
    
    # Follow logs in real-time
-   supabase functions logs send-consumption --tail --project-ref ipvtnhiweddairoakwnv
+   supabase functions logs send-consumption --tail --project-ref <PROJECT-REF>
    ```
 
 3. **Via API:**
@@ -77,7 +77,7 @@ Example:
 
 ### Test Webhook Function
 ```bash
-curl -X POST https://ipvtnhiweddairoakwnv.supabase.co/functions/v1/webhook \
+curl -X POST https://<PROJECT-REF>.supabase.co/functions/v1/webhook \
   -H "Content-Type: application/json" \
   -d '{"signedPayload": "test"}' \
   -v
@@ -87,14 +87,14 @@ Check response headers for `requestId`, then search logs with that ID.
 
 ### Test Send-Consumption Function
 ```bash
-curl -X POST https://ipvtnhiweddairoakwnv.supabase.co/functions/v1/send-consumption \
+curl -X POST https://<PROJECT-REF>.supabase.co/functions/v1/send-consumption \
   -H "Authorization: Bearer YOUR_SERVICE_KEY" \
   -v
 ```
 
 ### Test Apple JWT Generation
 ```bash
-curl -X POST https://ipvtnhiweddairoakwnv.supabase.co/functions/v1/apple-jwt \
+curl -X POST https://<PROJECT-REF>.supabase.co/functions/v1/apple-jwt \
   -H "Authorization: Bearer YOUR_SERVICE_KEY" \
   -v
 ```
@@ -163,24 +163,24 @@ Detailed information (development only):
 ### 1. Track a Specific Request
 Use the request ID to follow the complete flow:
 ```bash
-supabase functions logs webhook --project-ref ipvtnhiweddairoakwnv | grep "abc123"
+supabase functions logs webhook --project-ref <PROJECT-REF> | grep "abc123"
 ```
 
 ### 2. Find All Errors in Last Hour
 ```bash
-supabase functions logs --project-ref ipvtnhiweddairoakwnv | grep "ERROR"
+supabase functions logs --project-ref <PROJECT-REF> | grep "ERROR"
 ```
 
 ### 3. Monitor Processing Times
 Look for patterns in processing duration:
 ```bash
-supabase functions logs --project-ref ipvtnhiweddairoakwnv | grep "Total processing time"
+supabase functions logs --project-ref <PROJECT-REF> | grep "Total processing time"
 ```
 
 ### 4. Debug Configuration Issues
 Check for configuration-related logs:
 ```bash
-supabase functions logs --project-ref ipvtnhiweddairoakwnv | grep -E "Configuration|config|credentials"
+supabase functions logs --project-ref <PROJECT-REF> | grep -E "Configuration|config|credentials"
 ```
 
 ## Performance Monitoring
@@ -193,7 +193,7 @@ Each request logs its total processing time. Monitor these to identify:
 Example analysis:
 ```bash
 # Find requests taking over 1000ms
-supabase functions logs --project-ref ipvtnhiweddairoakwnv | grep "Total processing time" | grep -E "[0-9]{4,}ms"
+supabase functions logs --project-ref <PROJECT-REF> | grep "Total processing time" | grep -E "[0-9]{4,}ms"
 ```
 
 ## Security Notes

@@ -26,8 +26,8 @@ The script will ask for:
 
 1. **Project Reference or URL**
    - You can enter either:
-     - Project reference: `dmyhbzzrpjfbevehpwkp`
-     - Full URL: `https://dmyhbzzrpjfbevehpwkp.supabase.co`
+     - Project reference: `<PROJECT-REF>`
+     - Full URL: `https://<PROJECT-REF>.supabase.co`
    - Find this in: Supabase Dashboard > Settings > General
 
 2. **Database Password**
