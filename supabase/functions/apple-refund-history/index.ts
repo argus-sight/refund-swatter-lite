@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 import { verifyAuth, handleCors, getCorsHeaders } from '../_shared/auth.ts'
+import { AppleEnvironment, normalizeEnvironment } from '../_shared/constants.ts'
 
 const corsHeaders = getCorsHeaders()
 
@@ -60,7 +61,8 @@ serve(async (req) => {
     const { jwt } = await jwtResponse.json()
 
     // Fetch refund history
-    const apiBase = APPLE_API_BASE[environment as keyof typeof APPLE_API_BASE] || APPLE_API_BASE.sandbox
+    const normalizedEnv = normalizeEnvironment(environment)
+    const apiBase = normalizedEnv === AppleEnvironment.SANDBOX ? APPLE_API_BASE.sandbox : APPLE_API_BASE.production
     const response = await fetch(`${apiBase}/refund/lookup/${transactionId}`, {
       method: 'GET',
       headers: {

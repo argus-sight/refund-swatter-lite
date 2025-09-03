@@ -119,7 +119,7 @@ export default function TestNotification({ environment }: TestNotificationProps)
               <span className="text-sm text-gray-600">
                 {phase === 'sending' && 'Sending test notification to Apple...'}
                 {phase === 'waiting' && 'Waiting for webhook delivery...'}
-                {phase === 'checking' && 'Checking delivery status...'}
+                {phase === 'checking' && 'Checking delivery status (may retry up to 3 times)...'}
               </span>
             </div>
             {testToken && (
@@ -139,7 +139,14 @@ export default function TestNotification({ environment }: TestNotificationProps)
                   <span className="text-xl">❌</span>
                   <p className="text-sm font-medium text-red-800">Test Failed</p>
                 </div>
-                <p className="text-xs text-red-600 mt-2">{error}</p>
+                <p className="text-xs text-red-600 mt-2">
+                  {error}
+                  {error.includes('retries exhausted') && (
+                    <span className="block mt-1 text-gray-500">
+                      The system attempted to check the status 3 times with 2-second intervals.
+                    </span>
+                  )}
+                </p>
               </>
             ) : result && (
               <>

@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { verifyAuth, handleCors, getCorsHeaders } from '../_shared/auth.ts'
+import { AppleEnvironment, normalizeEnvironment } from '../_shared/constants.ts'
 
 // Apple API base URLs
 const APPLE_API_BASE_PRODUCTION = 'https://api.storekit.itunes.apple.com/inApps/v1'
@@ -232,7 +233,9 @@ async function fetchAllNotificationHistory(
   requestId: string
 ): Promise<any[]> {
   
-  const apiBase = environment === 'sandbox' ? APPLE_API_BASE_SANDBOX : APPLE_API_BASE_PRODUCTION
+  // Normalize environment for consistent comparison
+  const normalizedEnv = normalizeEnvironment(environment)
+  const apiBase = normalizedEnv === AppleEnvironment.SANDBOX ? APPLE_API_BASE_SANDBOX : APPLE_API_BASE_PRODUCTION
   const allNotifications: any[] = []
   let hasMore = true
   let paginationToken: string | null = null
