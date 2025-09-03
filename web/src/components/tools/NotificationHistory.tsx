@@ -118,44 +118,6 @@ export default function NotificationHistory({ environment }: NotificationHistory
     }
   }
 
-  const notificationTypeOptions = [
-    // Refund related
-    'CONSUMPTION_REQUEST',
-    'REFUND',
-    'REFUND_DECLINED',
-    'REFUND_REVERSED',
-    
-    // Subscription lifecycle
-    'SUBSCRIBED',
-    'DID_RENEW',
-    'DID_FAIL_TO_RENEW',
-    'EXPIRED',
-    'GRACE_PERIOD_EXPIRED',
-    
-    // Subscription changes
-    'DID_CHANGE_RENEWAL_PREF',
-    'DID_CHANGE_RENEWAL_STATUS',
-    'OFFER_REDEEMED',
-    'PRICE_INCREASE',
-    'RENEWAL_EXTENDED',
-    'RENEWAL_EXTENSION',
-    
-    // Purchase events
-    'ONE_TIME_CHARGE',
-    'REVOKE',
-    
-    // External purchase
-    'EXTERNAL_PURCHASE_TOKEN',
-    
-    // Advanced Commerce API
-    'METADATA_UPDATE',
-    'MIGRATION',
-    'PRICE_CHANGE',
-    
-    // Testing
-    'TEST'
-  ]
-
   return (
     <div className="bg-white rounded-lg shadow p-6">
       <h2 className="text-lg font-semibold mb-4">Apple Notification History</h2>
