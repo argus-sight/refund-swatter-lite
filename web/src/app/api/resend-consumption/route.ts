@@ -101,12 +101,19 @@ export async function POST(request: Request) {
       })
     })
 
-    if (!response.ok) {
-      const error = await response.text()
-      throw new Error(`Failed to send consumption data: ${error}`)
-    }
-
     const result = await response.json()
+    
+    if (!response.ok) {
+      console.error('Edge Function error:', result)
+      return NextResponse.json(
+        { 
+          error: result.error || 'Failed to send consumption data',
+          details: result.details,
+          requestId: result.requestId
+        },
+        { status: response.status }
+      )
+    }
 
     // Update consumption request status based on result
     if (requestId && result.results && result.results.length > 0) {

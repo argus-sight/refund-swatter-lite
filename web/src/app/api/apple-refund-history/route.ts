@@ -48,7 +48,15 @@ export async function POST(request: NextRequest) {
     const data = await response.json()
 
     if (!response.ok) {
-      throw new Error(data.errorMessage || 'Failed to fetch refund history')
+      console.error('Apple API error:', data)
+      return NextResponse.json(
+        { 
+          error: data.errorMessage || data.error || 'Failed to fetch refund history',
+          errorCode: data.errorCode,
+          details: data
+        },
+        { status: response.status }
+      )
     }
 
     // Parse signed transactions

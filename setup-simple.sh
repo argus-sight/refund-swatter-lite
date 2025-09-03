@@ -47,7 +47,7 @@ echo -e "${YELLOW}Step 1: Linking Supabase project...${NC}"
 supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD" 2>/dev/null || true
 echo -e "${GREEN}✓ Project linked${NC}"
 
-# Step 2: Get API keys
+# Step 2: Generate environment files from .env.project
 echo -e "${YELLOW}Step 2: Getting API keys...${NC}"
 KEYS_OUTPUT=$(supabase projects api-keys --project-ref "$SUPABASE_PROJECT_REF")
 ANON_KEY=$(echo "$KEYS_OUTPUT" | grep "anon" | awk '{print $NF}')
@@ -56,21 +56,42 @@ API_URL="https://$SUPABASE_PROJECT_REF.supabase.co"
 CRON_SECRET=$(openssl rand -hex 32)
 echo -e "${GREEN}✓ Keys retrieved${NC}"
 
-# Step 3: Generate .env files
+# Step 3: Generate web/.env from .env.project values
 echo -e "${YELLOW}Step 3: Generating environment files...${NC}"
-cat > .env << EOF
+
+# Use values from .env.project if available, otherwise generate new ones
+if [ -n "$NEXT_PUBLIC_SUPABASE_URL" ]; then
+    API_URL=$NEXT_PUBLIC_SUPABASE_URL
+else
+    API_URL="https://$SUPABASE_PROJECT_REF.supabase.co"
+fi
+
+if [ -n "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ]; then
+    ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+fi
+
+if [ -n "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+    SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY
+fi
+
+if [ -z "$CRON_SECRET" ]; then
+    CRON_SECRET=$(openssl rand -hex 32)
+fi
+
+# Create web/.env from consolidated values
+if [ -d "web" ]; then
+    cat > web/.env << EOF
 # Auto-generated from .env.project
 NEXT_PUBLIC_SUPABASE_URL=$API_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY
 SUPABASE_PROJECT_REF=$SUPABASE_PROJECT_REF
 CRON_SECRET=$CRON_SECRET
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
+NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
 APPLE_BUNDLE_ID=$APPLE_BUNDLE_ID
 EOF
-
-[ -d "web" ] && cp .env web/.env
-echo -e "${GREEN}✓ Environment files created${NC}"
+    echo -e "${GREEN}✓ web/.env created${NC}"
+fi
 
 # Step 4: Enable required extensions
 echo -e "${YELLOW}Step 4: Setting up required extensions...${NC}"

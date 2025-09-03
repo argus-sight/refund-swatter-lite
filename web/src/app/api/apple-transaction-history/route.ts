@@ -81,7 +81,15 @@ export async function POST(request: NextRequest) {
     })
 
     if (!response.ok) {
-      throw new Error(data.errorMessage || 'Failed to fetch transaction history')
+      console.error('Apple API error:', data)
+      return NextResponse.json(
+        { 
+          error: data.errorMessage || data.error || 'Failed to fetch transaction history',
+          errorCode: data.errorCode,
+          details: data
+        },
+        { status: response.status }
+      )
     }
 
     // Parse signed transactions (JWS format)

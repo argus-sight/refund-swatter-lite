@@ -47,12 +47,19 @@ export async function POST(request: Request) {
       })
     })
 
-    if (!response.ok) {
-      const error = await response.text()
-      throw new Error(`Failed to trigger processing: ${error}`)
-    }
-
     const result = await response.json()
+    
+    if (!response.ok) {
+      console.error('Edge Function error:', result)
+      return NextResponse.json(
+        { 
+          error: result.error || 'Failed to trigger processing',
+          details: result.details,
+          requestId: result.requestId
+        },
+        { status: response.status }
+      )
+    }
 
     return NextResponse.json({
       success: true,

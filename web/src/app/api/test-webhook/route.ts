@@ -118,7 +118,17 @@ export async function POST(request: NextRequest) {
     if (response.status === 401) {
       console.error('Authentication failed. JWT may be invalid or Apple credentials are incorrect.')
       console.log('JWT used:', jwt.substring(0, 50) + '...')
-      throw new Error('Apple API authentication failed. Please check your Apple credentials (Issuer ID, Key ID, and Private Key).')
+      return NextResponse.json(
+        { 
+          error: 'Apple API authentication failed. Please check your Apple credentials (Issuer ID, Key ID, and Private Key).',
+          errorCode: 'AUTH_FAILED',
+          details: {
+            status: 401,
+            message: 'Authentication failed'
+          }
+        },
+        { status: 401 }
+      )
     }
     
     let data = null
@@ -128,12 +138,29 @@ export async function POST(request: NextRequest) {
       } catch (parseError) {
         console.error('Failed to parse Apple API response:', parseError)
         console.error('Response was:', appleResponseText)
-        throw new Error('Invalid Apple API response format')
+        return NextResponse.json(
+          { 
+            error: 'Invalid Apple API response format',
+            details: {
+              status: response.status,
+              responseText: appleResponseText
+            }
+          },
+          { status: 502 }
+        )
       }
     }
 
     if (!response.ok) {
-      throw new Error(data?.errorMessage || `Apple API error: ${response.status} ${response.statusText}`)
+      console.error('Apple API error:', data)
+      return NextResponse.json(
+        { 
+          error: data?.errorMessage || data?.error || `Apple API error: ${response.status} ${response.statusText}`,
+          errorCode: data?.errorCode,
+          details: data
+        },
+        { status: response.status }
+      )
     }
 
     return NextResponse.json({

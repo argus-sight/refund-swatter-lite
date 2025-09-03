@@ -27,7 +27,16 @@ export async function POST(request: NextRequest) {
     const data = await response.json()
 
     if (!response.ok) {
-      throw new Error(data.error || 'Failed to fetch notification history')
+      // Pass through the complete error information from Edge Function
+      console.error('Edge Function error:', data)
+      return NextResponse.json(
+        { 
+          error: data.error || 'Failed to fetch notification history',
+          details: data.details,
+          requestId: data.requestId 
+        },
+        { status: response.status }
+      )
     }
 
     // The Edge Function now returns all notifications with pagination handled

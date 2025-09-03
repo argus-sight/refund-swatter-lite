@@ -28,16 +28,19 @@ export async function POST(request: NextRequest) {
       }
     )
 
+    const result = await response.json()
+    
     if (!response.ok) {
-      const errorText = await response.text()
-      console.error('Edge function error:', errorText)
+      console.error('Edge function error:', result)
       return NextResponse.json(
-        { error: 'Failed to reprocess notification' },
+        { 
+          error: result.error || 'Failed to reprocess notification',
+          details: result.details,
+          requestId: result.requestId
+        },
         { status: response.status }
       )
     }
-
-    const result = await response.json()
     
     return NextResponse.json({
       success: true,

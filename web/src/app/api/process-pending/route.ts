@@ -85,16 +85,18 @@ export async function POST(request: NextRequest) {
           })
         })
         
+        const data = await response.json()
+        
         if (!response.ok) {
-          const errorText = await response.text()
-          console.error(`Batch ${i + 1} failed:`, errorText)
+          console.error(`Batch ${i + 1} failed:`, data)
           results.push({
             batch: i + 1,
             success: false,
-            error: errorText
+            error: data.error || 'Failed to process batch',
+            details: data.details,
+            requestId: data.requestId
           })
         } else {
-          const data = await response.json()
           console.log(`Batch ${i + 1} processed:`, data)
           results.push({
             batch: i + 1,

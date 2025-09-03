@@ -21,11 +21,18 @@ export async function GET(request: Request) {
       body: JSON.stringify(rpcBody)
     })
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch metrics: ${response.statusText}`)
-    }
-
     const data = await response.json()
+    
+    if (!response.ok) {
+      console.error('Supabase RPC error:', data)
+      return NextResponse.json(
+        { 
+          error: data.message || data.error || `Failed to fetch metrics: ${response.statusText}`,
+          details: data
+        },
+        { status: response.status }
+      )
+    }
     // Supabase RPC returns an array, but we need the first element
     const metrics = Array.isArray(data) && data.length > 0 ? data[0] : data
     return NextResponse.json(metrics)

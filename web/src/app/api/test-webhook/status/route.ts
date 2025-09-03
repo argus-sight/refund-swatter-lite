@@ -62,7 +62,15 @@ export async function POST(request: NextRequest) {
     })
 
     if (!response.ok) {
-      throw new Error(data.errorMessage || 'Failed to check test notification status')
+      console.error('Apple API error:', data)
+      return NextResponse.json(
+        { 
+          error: data.errorMessage || data.error || 'Failed to check test notification status',
+          errorCode: data.errorCode,
+          details: data
+        },
+        { status: response.status }
+      )
     }
 
     // Return the data directly, not nested under 'status'

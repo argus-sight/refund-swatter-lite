@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { AppleEnvironment } from '@/lib/apple'
 
 interface NotificationHistoryProps {
@@ -12,11 +12,20 @@ export default function NotificationHistory({ environment }: NotificationHistory
   const [result, setResult] = useState<any>(null)
   const [error, setError] = useState('')
   const [params, setParams] = useState({
-    startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    startDate: new Date(Date.now() - (environment === 'Sandbox' ? 30 : 180) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0],
     notificationType: '',  // Changed from array to single string
     transactionId: ''
   })
+
+  // Update date when environment changes
+  useEffect(() => {
+    setParams(prev => ({
+      ...prev,
+      startDate: new Date(Date.now() - (environment === 'Sandbox' ? 30 : 180) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      endDate: new Date().toISOString().split('T')[0],
+    }))
+  }, [environment])
 
   const handleFetch = async () => {
     setLoading(true)
@@ -91,7 +100,8 @@ export default function NotificationHistory({ environment }: NotificationHistory
     <div className="bg-white rounded-lg shadow p-6">
       <h2 className="text-lg font-semibold mb-4">Apple Notification History</h2>
       <p className="text-sm text-gray-600 mb-4">
-        Query notification history directly from Apple
+        Query notification history directly from Apple 
+        ({environment === 'Sandbox' ? 'Sandbox: Last 30 days recommended' : 'Production: Up to 180 days available'})
       </p>
 
       <div className="space-y-4">
@@ -106,6 +116,15 @@ export default function NotificationHistory({ environment }: NotificationHistory
               onChange={(e) => setParams({ ...params, startDate: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
             />
+            {environment === 'Sandbox' ? (
+              <p className="text-xs text-gray-500 mt-1">
+                Sandbox environment: Recommended to query within 30 days for better data availability.
+              </p>
+            ) : (
+              <p className="text-xs text-gray-500 mt-1">
+                Production environment: Apple returns up to 180 days of notification history.
+              </p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">

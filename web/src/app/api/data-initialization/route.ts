@@ -51,7 +51,15 @@ export async function POST(request: NextRequest) {
     const data = await response.json()
 
     if (!response.ok) {
-      throw new Error(data.error || 'Failed to initialize data')
+      console.error('Edge Function error:', data)
+      return NextResponse.json(
+        { 
+          error: data.error || 'Failed to initialize data',
+          details: data.details,
+          requestId: data.requestId
+        },
+        { status: response.status }
+      )
     }
 
     // The Edge Function now returns the initialization summary

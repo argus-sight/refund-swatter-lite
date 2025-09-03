@@ -13,7 +13,7 @@ export default function DataInitialization({ environment, onComplete }: DataInit
   const [result, setResult] = useState<any>(null)
   const [error, setError] = useState<{ message: string; details?: any } | null>(null)
   const [dateRange, setDateRange] = useState({
-    startDate: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 3 months ago
+    startDate: new Date(Date.now() - (environment === 'Sandbox' ? 30 : 180) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0]
   })
   const [notificationTypes, setNotificationTypes] = useState<string[]>([]) // Empty means all types
@@ -90,7 +90,8 @@ export default function DataInitialization({ environment, onComplete }: DataInit
     <div className="bg-white rounded-lg shadow p-6">
       <h2 className="text-lg font-semibold mb-4">Data Initialization</h2>
       <p className="text-sm text-gray-600 mb-4">
-        Import historical notification data from Apple. Default: Last 3 months of all notification types.
+        Import historical notification data from Apple. 
+        Default: Last {environment === 'Sandbox' ? '30 days' : '180 days'} of all notification types.
       </p>
 
       <div className="space-y-4">
@@ -218,7 +219,10 @@ export default function DataInitialization({ environment, onComplete }: DataInit
 
         <div className="text-xs text-gray-500">
           Note: This will fetch notifications from Apple for the {environment} environment.
-          Maximum date range is 180 days. Data is stored incrementally as each page is fetched.
+          {environment === 'Sandbox' 
+            ? 'Sandbox environment: Recommended to use 30 days or less for better data availability.'
+            : 'Production environment: Maximum date range is 180 days.'}
+          Data is stored incrementally as each page is fetched.
         </div>
       </div>
     </div>

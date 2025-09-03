@@ -173,7 +173,19 @@ async function fetchNotificationHistoryPage(
       console.error(`[${requestId}] ❌ Apple API error on page ${pageNumber}:`)
       console.error(`[${requestId}] Status: ${response.status}`)
       console.error(`[${requestId}] Error:`, errorData)
-      throw new Error(errorData.errorMessage || `Apple API returned ${response.status}`)
+      
+      // Create detailed error object
+      const errorDetails = {
+        status: response.status,
+        message: errorData.errorMessage || errorData.error || `Apple API returned ${response.status}`,
+        appleErrorCode: errorData.errorCode,
+        appleErrorMessage: errorData.errorMessage,
+        fullResponse: errorData
+      }
+      
+      const error = new Error(errorDetails.message)
+      ;(error as any).details = errorDetails
+      throw error
     }
 
     const data = responseData || JSON.parse(responseText)
@@ -440,19 +452,24 @@ serve(async (req) => {
     console.error(`[${requestId}] ==> Request Failed with Error`)
     console.error(`[${requestId}] Error Type: ${error.name}`)
     console.error(`[${requestId}] Error Message: ${error.message}`)
+    console.error(`[${requestId}] Error Details:`, (error as any).details)
     console.error(`[${requestId}] Stack Trace:`, error.stack)
     console.error(`[${requestId}] Processing time before error: ${duration}ms`)
     console.error(`[${requestId}] ************************************************************`)
     
+    // Determine appropriate status code
+    const statusCode = (error as any).details?.status || 500
+    
     return new Response(
       JSON.stringify({ 
         error: error.message || 'Failed to fetch notification history',
+        details: (error as any).details,
         requestId,
         processingTime: duration
       }),
       { 
         headers: { ...getCorsHeaders(), 'Content-Type': 'application/json' },
-        status: 500 
+        status: statusCode 
       }
     )
   }
