@@ -103,16 +103,19 @@ serve(async (req) => {
     }
 
     // Log the API request
-    await supabase.from('apple_api_logs').insert({
+    const { error: logError } = await supabase.from('apple_api_logs').insert({
       endpoint: url,
       method: 'GET',
       request_body: null,
       response_status: response.status,
       response_body: data,
-      response_time_ms: endTime - startTime,
-      environment: environment,
-      notes: `Transaction history for ${transactionId}`
+      duration_ms: endTime - startTime,
+      notes: `Transaction history for ${transactionId} - ${environment}`
     })
+    
+    if (logError) {
+      console.error('Failed to log API request:', logError)
+    }
 
     if (!response.ok) {
       console.error('Apple API error:', data)

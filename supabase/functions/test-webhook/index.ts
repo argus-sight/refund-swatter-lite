@@ -42,6 +42,7 @@ serve(async (req) => {
 
     const { environment } = await req.json()
     
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     
     // Get config from config table (single tenant)
@@ -143,16 +144,19 @@ serve(async (req) => {
       }
     }
     
-    await supabaseAdmin.from('apple_api_logs').insert({
+    const { error: logError } = await supabaseAdmin.from('apple_api_logs').insert({
       endpoint: apiUrl,
       method: 'POST',
       request_body: requestBody,
       response_status: response.status,
       response_body: responseBody,
-      response_time_ms: endTime - startTime,
-      environment: environment,
-      notes: 'Test notification request'
+      duration_ms: endTime - startTime,
+      notes: `Test notification request - ${environment}`
     })
+    
+    if (logError) {
+      console.error('Failed to log API request:', logError)
+    }
     
     // Handle empty response for 401 errors
     if (response.status === 401) {

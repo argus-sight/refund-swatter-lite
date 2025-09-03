@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { AppleEnvironment } from '@/lib/apple'
 import { callEdgeFunction } from '@/lib/edge-functions'
 
@@ -10,68 +10,90 @@ interface TestNotificationProps {
 
 export default function TestNotification({ environment }: TestNotificationProps) {
   const [testing, setTesting] = useState(false)
-  const [testResult, setTestResult] = useState<any>(null)
-  const [statusToken, setStatusToken] = useState('')
-  const [statusResult, setStatusResult] = useState<any>(null)
-  const [checkingStatus, setCheckingStatus] = useState(false)
+  const [phase, setPhase] = useState<'idle' | 'sending' | 'waiting' | 'checking' | 'complete'>('idle')
+  const [result, setResult] = useState<any>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [testToken, setTestToken] = useState<string | null>(null)
 
   const handleTest = async () => {
+    // Reset state
+    setResult(null)
+    setError(null)
+    setTestToken(null)
+    setPhase('sending')
     setTesting(true)
-    setTestResult(null)
     
     try {
-      const { data, error } = await callEdgeFunction('test-webhook', { environment })
+      // Step 1: Send test notification
+      const { data: sendData, error: sendError } = await callEdgeFunction('test-webhook', { environment })
       
-      if (error) {
-        setTestResult({ error: error.message })
-      } else {
-        setTestResult(data)
+      if (sendError) {
+        setError(sendError.message)
+        setPhase('complete')
+        setTesting(false)
+        return
       }
+
+      if (!sendData.testNotificationToken) {
+        setError('No test token received')
+        setPhase('complete')
+        setTesting(false)
+        return
+      }
+
+      setTestToken(sendData.testNotificationToken)
+      setPhase('waiting')
+
+      // Step 2: Wait 2 seconds
+      await new Promise(resolve => setTimeout(resolve, 2000))
       
-      if (data.testNotificationToken) {
-        setStatusToken(data.testNotificationToken)
-      }
-    } catch (error) {
-      setTestResult({ 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Test failed' 
+      // Step 3: Check status
+      setPhase('checking')
+      const { data: statusData, error: statusError } = await callEdgeFunction('test-webhook-status', { 
+        testNotificationToken: sendData.testNotificationToken,
+        environment 
       })
+      
+      if (statusError) {
+        setError(statusError.message)
+      } else {
+        setResult(statusData)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Test failed')
     } finally {
+      setPhase('complete')
       setTesting(false)
     }
   }
 
-  const checkStatus = async () => {
-    if (!statusToken) return
-    
-    setCheckingStatus(true)
-    setStatusResult(null)
-    
-    try {
-      const { data, error } = await callEdgeFunction('test-webhook-status', { 
-        testNotificationToken: statusToken,
-        environment 
-      })
-      
-      if (error) {
-        setStatusResult({ error: error.message })
-      } else {
-        setStatusResult(data)
-      }
-    } catch (error) {
-      setStatusResult({ 
-        error: error instanceof Error ? error.message : 'Status check failed' 
-      })
-    } finally {
-      setCheckingStatus(false)
+  const getButtonText = () => {
+    switch (phase) {
+      case 'sending':
+        return 'Sending test notification...'
+      case 'waiting':
+        return 'Waiting for delivery (2s)...'
+      case 'checking':
+        return 'Checking status...'
+      default:
+        return 'Send Test & Check Status'
     }
+  }
+
+  const getStatusIcon = () => {
+    if (phase === 'sending') return '📤'
+    if (phase === 'waiting') return '⏳'
+    if (phase === 'checking') return '🔍'
+    if (phase === 'complete' && result?.firstSendAttemptResult === 'SUCCESS') return '✅'
+    if (phase === 'complete' && error) return '❌'
+    return null
   }
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
       <h2 className="text-lg font-semibold mb-4">Test Webhook</h2>
       <p className="text-sm text-gray-600 mb-4">
-        Send a test notification to verify webhook configuration
+        Send a test notification and verify delivery status
       </p>
 
       <div className="space-y-4">
@@ -84,77 +106,83 @@ export default function TestNotification({ environment }: TestNotificationProps)
         <button
           onClick={handleTest}
           disabled={testing}
-          className="w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
+          className="w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 transition-colors"
         >
-          {testing ? 'Sending Test...' : 'Send Test Notification'}
+          {getButtonText()}
         </button>
 
-        {testResult && (
-          <div className={`p-3 rounded-md ${testResult.success ? 'bg-green-50' : 'bg-red-50'}`}>
-            <p className={`text-sm ${testResult.success ? 'text-green-800' : 'text-red-800'}`}>
-              {testResult.success ? 'Test notification sent successfully!' : 'Test failed'}
-            </p>
-            {testResult.error && (
-              <p className="text-xs text-red-600 mt-1">{testResult.error}</p>
-            )}
-            {testResult.testNotificationToken && (
-              <div className="mt-2">
-                <p className="text-xs text-gray-600">Test token:</p>
-                <p className="text-xs font-mono bg-white px-2 py-1 rounded mt-1">
-                  {testResult.testNotificationToken}
-                </p>
+        {/* Progress indicator */}
+        {testing && (
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2">
+              <span className="text-2xl animate-pulse">{getStatusIcon()}</span>
+              <span className="text-sm text-gray-600">
+                {phase === 'sending' && 'Sending test notification to Apple...'}
+                {phase === 'waiting' && 'Waiting for webhook delivery...'}
+                {phase === 'checking' && 'Checking delivery status...'}
+              </span>
+            </div>
+            {testToken && (
+              <div className="text-xs text-gray-500 font-mono bg-gray-50 p-2 rounded">
+                Token: {testToken}
               </div>
             )}
           </div>
         )}
 
-        {statusToken && (
-          <>
-            <div className="border-t pt-4">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Check Test Status</h3>
-              <input
-                type="text"
-                value={statusToken}
-                onChange={(e) => setStatusToken(e.target.value)}
-                placeholder="Test notification token"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm mb-2"
-              />
-              <button
-                onClick={checkStatus}
-                disabled={checkingStatus || !statusToken}
-                className="w-full px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-50"
-              >
-                {checkingStatus ? 'Checking...' : 'Check Status'}
-              </button>
-            </div>
-
-            {statusResult && (
-              <div className={`p-3 rounded-md ${statusResult.error ? 'bg-red-50' : statusResult.firstSendAttemptResult === 'SUCCESS' ? 'bg-green-50' : 'bg-blue-50'}`}>
-                {statusResult.error ? (
-                  <p className="text-sm text-red-800">{statusResult.error}</p>
-                ) : (
-                  <>
-                    <p className={`text-sm ${statusResult.firstSendAttemptResult === 'SUCCESS' ? 'text-green-800' : 'text-blue-800'}`}>
-                      Status: {statusResult.firstSendAttemptResult || 'Unknown'}
-                    </p>
-                    {statusResult.firstSendAttemptResult === 'SUCCESS' && (
-                      <p className="text-xs text-gray-600 mt-1">
-                        Notification received and processed successfully
+        {/* Result display */}
+        {phase === 'complete' && (error || result) && (
+          <div className={`p-4 rounded-md ${error ? 'bg-red-50' : result?.firstSendAttemptResult === 'SUCCESS' ? 'bg-green-50' : 'bg-yellow-50'}`}>
+            {error ? (
+              <>
+                <div className="flex items-center space-x-2">
+                  <span className="text-xl">❌</span>
+                  <p className="text-sm font-medium text-red-800">Test Failed</p>
+                </div>
+                <p className="text-xs text-red-600 mt-2">{error}</p>
+              </>
+            ) : result && (
+              <>
+                <div className="flex items-center space-x-2">
+                  {result.firstSendAttemptResult === 'SUCCESS' ? (
+                    <>
+                      <span className="text-xl">✅</span>
+                      <p className="text-sm font-medium text-green-800">Webhook Verified Successfully</p>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-xl">⚠️</span>
+                      <p className="text-sm font-medium text-yellow-800">
+                        Status: {result.firstSendAttemptResult || 'Pending'}
                       </p>
-                    )}
-                    {statusResult.sendAttempts && statusResult.sendAttempts.length > 0 && (
-                      <div className="mt-1">
-                        <p className="text-xs text-gray-600">Send attempts: {statusResult.sendAttempts.length}</p>
+                    </>
+                  )}
+                </div>
+                
+                {result.sendAttempts && result.sendAttempts.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <p className="text-xs text-gray-600">
+                      Delivery attempts: {result.sendAttempts.length}
+                    </p>
+                    {result.sendAttempts.map((attempt: any, index: number) => (
+                      <div key={index} className="mt-1">
                         <p className="text-xs text-gray-500">
-                          Last attempt: {new Date(statusResult.sendAttempts[0].attemptDate).toLocaleString()}
+                          • {new Date(attempt.attemptDate).toLocaleString()} - {attempt.responseStatusCode || 'N/A'}
                         </p>
                       </div>
-                    )}
-                  </>
+                    ))}
+                  </div>
                 )}
-              </div>
+                
+                {testToken && (
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <p className="text-xs text-gray-500">Test Token:</p>
+                    <p className="text-xs font-mono text-gray-600 break-all">{testToken}</p>
+                  </div>
+                )}
+              </>
             )}
-          </>
+          </div>
         )}
       </div>
     </div>

@@ -88,16 +88,19 @@ serve(async (req) => {
     console.log('Apple status check response:', JSON.stringify(data, null, 2))
     
     // Log the API request to apple_api_logs table
-    await supabaseAdmin.from('apple_api_logs').insert({
+    const { error: logError } = await supabaseAdmin.from('apple_api_logs').insert({
       endpoint: apiUrl,
       method: 'GET',
       request_body: null,
       response_status: response.status,
       response_body: data,
-      response_time_ms: endTime - startTime,
-      environment: environment,
-      notes: `Test notification status check for token: ${testNotificationToken}`
+      duration_ms: endTime - startTime,
+      notes: `Test notification status check for token: ${testNotificationToken} - ${environment}`
     })
+    
+    if (logError) {
+      console.error('Failed to log API request:', logError)
+    }
 
     if (!response.ok) {
       console.error('Apple API error:', data)
