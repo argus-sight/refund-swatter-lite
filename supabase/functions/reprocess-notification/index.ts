@@ -1,18 +1,29 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0'
+import { verifyAuth, handleCors, getCorsHeaders } from '../_shared/auth.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+const corsHeaders = getCorsHeaders()
 
 serve(async (req) => {
   // Handle CORS
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+  const corsResponse = handleCors(req)
+  if (corsResponse) {
+    return corsResponse
   }
 
   try {
+    // Verify authentication
+    const auth = await verifyAuth(req, {
+      allowServiceRole: false,
+      requireAdmin: false  // Set to true if only admins should reprocess notifications
+    })
+
+    if (!auth.isValid) {
+      return auth.errorResponse!
+    }
+
+    const { user } = auth
+    console.log('User authenticated:', user.id)
     const { notification_uuid } = await req.json()
 
     if (!notification_uuid) {

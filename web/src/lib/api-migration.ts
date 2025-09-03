@@ -17,8 +17,6 @@ export async function callMigratedAPI(
   // Map old API routes to new Edge Functions
   const routeMap: Record<string, string> = {
     '/api/consumption-metrics': 'consumption-metrics',
-    '/api/retry-notification': 'retry-notification',
-    '/api/resend-consumption': 'resend-consumption',
     '/api/apple-refund-history': 'apple-refund-history',
     '/api/apple-transaction-history': 'apple-transaction-history',
     '/api/apple-notification-history': 'apple-notification-history',
