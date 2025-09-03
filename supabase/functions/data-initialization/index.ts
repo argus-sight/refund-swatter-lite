@@ -451,44 +451,87 @@ serve(async (req) => {
     // Get Apple JWT
     const jwt = await getAppleJWT(supabase, requestId)
 
-    // Build request body for Apple API
+    // Build request body for Apple API following strict date logic rules
     const requestBody: any = {}
     const now = Date.now()
     
+    // Step 1: Parse dates if provided
+    let parsedStartDate: number | undefined
+    let parsedEndDate: number | undefined
+    
     if (startDate) {
-      // Parse date string as local date and set to start of day UTC
       // Format: "YYYY-MM-DD" -> treat as UTC date at 00:00:00.000
       const startDateTime = new Date(startDate + 'T00:00:00.000Z')
-      requestBody.startDate = startDateTime.getTime()
-      console.log(`[${requestId}] Start date: ${startDate} -> ${startDateTime.toISOString()} (${requestBody.startDate})`)
+      parsedStartDate = startDateTime.getTime()
+      console.log(`[${requestId}] Parsed start date: ${startDate} -> ${startDateTime.toISOString()} (${parsedStartDate})`)
     }
     
     if (endDate) {
-      // Parse date string as local date and set to end of day UTC
       // Format: "YYYY-MM-DD" -> treat as UTC date at 23:59:59.999
       const endDateTime = new Date(endDate + 'T23:59:59.999Z')
-      let endTimestamp = endDateTime.getTime()
-      
-      // Validate: endDate cannot be in the future
-      if (endTimestamp > now) {
-        console.log(`[${requestId}] End date ${endDateTime.toISOString()} is in the future, clamping to current time`)
-        endTimestamp = now
-      }
-      
-      requestBody.endDate = endTimestamp
-      console.log(`[${requestId}] End date: ${endDate} -> ${new Date(endTimestamp).toISOString()} (${endTimestamp})`)
+      parsedEndDate = endDateTime.getTime()
+      console.log(`[${requestId}] Parsed end date: ${endDate} -> ${endDateTime.toISOString()} (${parsedEndDate})`)
     }
     
-    // Validate date range doesn't exceed 180 days
-    if (requestBody.startDate && requestBody.endDate) {
-      const rangeInDays = (requestBody.endDate - requestBody.startDate) / (1000 * 60 * 60 * 24)
-      if (rangeInDays > 180) {
-        console.log(`[${requestId}] Date range ${rangeInDays.toFixed(1)} days exceeds 180 days limit, adjusting start date`)
-        // Adjust start date to be 180 days before end date (minus 1 millisecond to stay under 180 days)
-        requestBody.startDate = requestBody.endDate - (180 * 24 * 60 * 60 * 1000 - 1)
-        console.log(`[${requestId}] Adjusted start date to: ${new Date(requestBody.startDate).toISOString()}`)
+    // Step 2: Apply default values if not provided
+    if (!parsedEndDate) {
+      // Default: today at 23:59:59.999 UTC
+      const today = new Date()
+      today.setUTCHours(23, 59, 59, 999)
+      parsedEndDate = today.getTime()
+      console.log(`[${requestId}] No end date provided, using today: ${today.toISOString()} (${parsedEndDate})`)
+    }
+    
+    if (!parsedStartDate) {
+      // Default: 30 days before end date (30 days - 1ms to ensure exactly 30 days)
+      parsedStartDate = parsedEndDate - (30 * 24 * 60 * 60 * 1000 - 1)
+      console.log(`[${requestId}] No start date provided, using 30 days before end: ${new Date(parsedStartDate).toISOString()} (${parsedStartDate})`)
+    }
+    
+    // Step 3: Normalize and validate
+    // 3.1: Swap if endDate < startDate
+    if (parsedEndDate < parsedStartDate) {
+      console.log(`[${requestId}] End date is before start date, swapping them`)
+      const temp = parsedStartDate
+      parsedStartDate = parsedEndDate
+      parsedEndDate = temp
+    }
+    
+    // 3.2: Check if range exceeds 180 days
+    const rangeInMs = parsedEndDate - parsedStartDate
+    const maxRangeMs = 180 * 24 * 60 * 60 * 1000 - 1 // 180 days minus 1ms
+    if (rangeInMs > maxRangeMs) {
+      console.log(`[${requestId}] Date range ${(rangeInMs / (24 * 60 * 60 * 1000)).toFixed(2)} days exceeds 180 days limit`)
+      // Adjust startDate to be exactly 180 days - 1ms before endDate
+      parsedStartDate = parsedEndDate - maxRangeMs
+      console.log(`[${requestId}] Adjusted start date to: ${new Date(parsedStartDate).toISOString()} (${parsedStartDate})`)
+    }
+    
+    // 3.3: Clamp endDate if it's in the future
+    const todayEnd = new Date()
+    todayEnd.setUTCHours(23, 59, 59, 999)
+    const todayEndMs = todayEnd.getTime()
+    
+    if (parsedEndDate > todayEndMs) {
+      console.log(`[${requestId}] End date is in the future, clamping to today: ${todayEnd.toISOString()}`)
+      parsedEndDate = todayEndMs
+      
+      // Re-check the 180-day constraint after clamping
+      const newRangeInMs = parsedEndDate - parsedStartDate
+      if (newRangeInMs > maxRangeMs) {
+        parsedStartDate = parsedEndDate - maxRangeMs
+        console.log(`[${requestId}] Re-adjusted start date after clamping: ${new Date(parsedStartDate).toISOString()}`)
       }
     }
+    
+    // Step 4: Set final values
+    requestBody.startDate = parsedStartDate
+    requestBody.endDate = parsedEndDate
+    
+    const finalRangeDays = (parsedEndDate - parsedStartDate) / (24 * 60 * 60 * 1000)
+    console.log(`[${requestId}] Final date range: ${finalRangeDays.toFixed(2)} days`)
+    console.log(`[${requestId}] Final start date: ${new Date(parsedStartDate).toISOString()} (${parsedStartDate})`)
+    console.log(`[${requestId}] Final end date: ${new Date(parsedEndDate).toISOString()} (${parsedEndDate})`)
     if (notificationType) {
       requestBody.notificationType = notificationType
     }
