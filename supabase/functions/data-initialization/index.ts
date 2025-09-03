@@ -453,16 +453,41 @@ serve(async (req) => {
 
     // Build request body for Apple API
     const requestBody: any = {}
+    const now = Date.now()
+    
     if (startDate) {
-      // Start date should be at 00:00:00 of that day
-      requestBody.startDate = new Date(startDate).getTime()
+      // Parse date string as local date and set to start of day UTC
+      // Format: "YYYY-MM-DD" -> treat as UTC date at 00:00:00.000
+      const startDateTime = new Date(startDate + 'T00:00:00.000Z')
+      requestBody.startDate = startDateTime.getTime()
+      console.log(`[${requestId}] Start date: ${startDate} -> ${startDateTime.toISOString()} (${requestBody.startDate})`)
     }
+    
     if (endDate) {
-      // End date should be at 23:59:59.999 of that day to include the entire day
-      const endDateTime = new Date(endDate)
-      endDateTime.setHours(23, 59, 59, 999)
-      requestBody.endDate = endDateTime.getTime()
-      console.log(`[${requestId}] Adjusted end date to include entire day: ${endDateTime.toISOString()}`)
+      // Parse date string as local date and set to end of day UTC
+      // Format: "YYYY-MM-DD" -> treat as UTC date at 23:59:59.999
+      const endDateTime = new Date(endDate + 'T23:59:59.999Z')
+      let endTimestamp = endDateTime.getTime()
+      
+      // Validate: endDate cannot be in the future
+      if (endTimestamp > now) {
+        console.log(`[${requestId}] End date ${endDateTime.toISOString()} is in the future, clamping to current time`)
+        endTimestamp = now
+      }
+      
+      requestBody.endDate = endTimestamp
+      console.log(`[${requestId}] End date: ${endDate} -> ${new Date(endTimestamp).toISOString()} (${endTimestamp})`)
+    }
+    
+    // Validate date range doesn't exceed 180 days
+    if (requestBody.startDate && requestBody.endDate) {
+      const rangeInDays = (requestBody.endDate - requestBody.startDate) / (1000 * 60 * 60 * 24)
+      if (rangeInDays > 180) {
+        console.log(`[${requestId}] Date range ${rangeInDays.toFixed(1)} days exceeds 180 days limit, adjusting start date`)
+        // Adjust start date to be 180 days before end date (minus 1 millisecond to stay under 180 days)
+        requestBody.startDate = requestBody.endDate - (180 * 24 * 60 * 60 * 1000 - 1)
+        console.log(`[${requestId}] Adjusted start date to: ${new Date(requestBody.startDate).toISOString()}`)
+      }
     }
     if (notificationType) {
       requestBody.notificationType = notificationType
