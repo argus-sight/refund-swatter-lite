@@ -1,15 +1,14 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { verifyAuth, handleCors, getCorsHeaders } from '../_shared/auth.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+const corsHeaders = getCorsHeaders()
 
 serve(async (req) => {
   // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+  const corsResponse = handleCors(req)
+  if (corsResponse) {
+    return corsResponse
   }
 
   try {
@@ -24,11 +23,7 @@ serve(async (req) => {
       }
     })
 
-    // Default admin credentials
-    const defaultEmail = 'admin@refundswatter.com'
-    const defaultPassword = 'ChangeMe123!'
-
-    // Check if any admin user exists
+    // First check if any admin exists
     const { data: existingAdmins, error: checkError } = await supabaseAdmin
       .from('admin_users')
       .select('id')
@@ -38,6 +33,25 @@ serve(async (req) => {
       console.error('Error checking for existing admins:', checkError)
       throw checkError
     }
+
+    // If admin exists, require authentication
+    if (existingAdmins && existingAdmins.length > 0) {
+      // Verify authentication - require service role if admin exists
+      const auth = await verifyAuth(req, {
+        allowServiceRole: true,
+        requireAdmin: false,
+        allowAnonymous: false
+      })
+
+      if (!auth.isValid) {
+        return auth.errorResponse!
+      }
+    }
+    // If no admin exists, allow anonymous access for initial setup
+
+    // Default admin credentials
+    const defaultEmail = 'admin@refundswatter.com'
+    const defaultPassword = 'ChangeMe123!'
 
     if (existingAdmins && existingAdmins.length > 0) {
       return new Response(

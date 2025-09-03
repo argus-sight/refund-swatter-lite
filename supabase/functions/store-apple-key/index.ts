@@ -1,38 +1,28 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
-import { corsHeaders } from '../_shared/cors.ts'
-import { requireAuth } from '../_shared/auth.ts'
+import { verifyAuth, handleCors, getCorsHeaders } from '../_shared/auth.ts'
+
+const corsHeaders = getCorsHeaders()
 
 serve(async (req) => {
   // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+  const corsResponse = handleCors(req)
+  if (corsResponse) {
+    return corsResponse
   }
 
   try {
-    // Verify authentication
-    const authResult = await requireAuth(req)
-    if (authResult.error) {
-      return authResult.error
-    }
-    const { supabase, user } = authResult
+    // Verify authentication with admin requirement
+    const auth = await verifyAuth(req, {
+      allowServiceRole: false,
+      requireAdmin: true
+    })
 
-    // Check if user is admin
-    const { data: adminUser, error: adminError } = await supabase
-      .from('admin_users')
-      .select('id')
-      .eq('id', user.id)
-      .single()
-
-    if (adminError || !adminUser) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized: Admin access required' }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 403
-        }
-      )
+    if (!auth.isValid) {
+      return auth.errorResponse!
     }
+
+    const { user } = auth
 
     if (req.method !== 'POST') {
       return new Response(

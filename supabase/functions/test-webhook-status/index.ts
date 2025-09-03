@@ -1,7 +1,8 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
-import { corsHeaders } from '../_shared/cors.ts'
-import { requireAuth } from '../_shared/auth.ts'
+import { verifyAuth, handleCors, getCorsHeaders } from '../_shared/auth.ts'
+
+const corsHeaders = getCorsHeaders()
 
 const APPLE_API_BASE = {
   production: 'https://api.storekit.itunes.apple.com/inApps/v1',
@@ -10,17 +11,23 @@ const APPLE_API_BASE = {
 
 serve(async (req) => {
   // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+  const corsResponse = handleCors(req)
+  if (corsResponse) {
+    return corsResponse
   }
 
   try {
     // Verify authentication
-    const authResult = await requireAuth(req)
-    if (authResult.error) {
-      return authResult.error
+    const auth = await verifyAuth(req, {
+      allowServiceRole: false,
+      requireAdmin: true
+    })
+
+    if (!auth.isValid) {
+      return auth.errorResponse!
     }
-    const { supabase, user } = authResult
+
+    const { user } = auth
 
     if (req.method !== 'POST') {
       return new Response(

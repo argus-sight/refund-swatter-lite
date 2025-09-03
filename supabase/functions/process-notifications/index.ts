@@ -1,22 +1,26 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-function getCorsHeaders() {
-  return corsHeaders
-}
+import { verifyAuth, handleCors, getCorsHeaders } from '../_shared/auth.ts'
 
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: getCorsHeaders() })
+  // Handle CORS preflight requests
+  const corsResponse = handleCors(req)
+  if (corsResponse) {
+    return corsResponse
   }
 
   try {
+    // Verify authentication - allow service role for internal calls
+    const auth = await verifyAuth(req, {
+      allowServiceRole: true,
+      requireAdmin: true
+    })
+
+    if (!auth.isValid) {
+      return auth.errorResponse!
+    }
+
     // Create Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!

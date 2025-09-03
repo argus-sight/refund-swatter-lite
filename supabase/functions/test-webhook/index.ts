@@ -1,11 +1,8 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
+import { verifyAuth, handleCors, getCorsHeaders } from '../_shared/auth.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
-}
+const corsHeaders = getCorsHeaders()
 
 const APPLE_API_BASE = {
   production: 'https://api.storekit.itunes.apple.com/inApps/v1',
@@ -14,65 +11,24 @@ const APPLE_API_BASE = {
 
 serve(async (req) => {
   // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+  const corsResponse = handleCors(req)
+  if (corsResponse) {
+    return corsResponse
   }
 
   try {
-    // Get the authorization header
-    const authHeader = req.headers.get('Authorization')
-    console.log('Auth header present:', !!authHeader)
-    console.log('Auth header format:', authHeader ? authHeader.substring(0, 20) + '...' : 'none')
-    
-    if (!authHeader) {
-      console.log('No authorization header found')
-      return new Response(
-        JSON.stringify({ error: 'Not authenticated' }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 401
-        }
-      )
+    // Verify authentication with admin requirement
+    const auth = await verifyAuth(req, {
+      allowServiceRole: false,
+      requireAdmin: true
+    })
+
+    if (!auth.isValid) {
+      return auth.errorResponse!
     }
-    
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
-    
-    // Extract the token from the Authorization header
-    const token = authHeader.replace('Bearer ', '')
-    console.log('Token extracted, length:', token.length)
-    
-    // Create Supabase client and verify the user's token
-    console.log('Creating Supabase client for user verification')
-    const userSupabase = createClient(supabaseUrl, supabaseAnonKey)
-    
-    // Verify the user is authenticated using the token directly
-    console.log('Verifying user token...')
-    const { data: { user }, error: authError } = await userSupabase.auth.getUser(token)
-    
-    if (authError) {
-      console.error('Auth error:', authError.message)
-      console.error('Auth error details:', authError)
-    }
-    
-    if (!user) {
-      console.log('No user found from token')
-    } else {
-      console.log('User authenticated:', user.id)
-    }
-    
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'Invalid or expired token',
-          details: authError?.message || 'No user found'
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 401
-        }
-      )
-    }
+
+    const { user } = auth
+    console.log('User authenticated:', user.id)
 
     if (req.method !== 'POST') {
       return new Response(
