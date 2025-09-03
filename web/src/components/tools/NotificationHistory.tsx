@@ -11,10 +11,26 @@ export default function NotificationHistory({ environment }: NotificationHistory
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<any>(null)
   const [error, setError] = useState('')
+  
+  // Helper function to get default date range following Apple API specifications
+  const getDefaultDateRange = () => {
+    // Default: last 30 days (including today)
+    const endDate = new Date()
+    // Set to end of today UTC
+    endDate.setUTCHours(23, 59, 59, 999)
+    
+    // Start date: 30 days before end date (30 days - 1ms to ensure exactly 30 days)
+    const startDate = new Date(endDate.getTime() - (30 * 24 * 60 * 60 * 1000 - 1))
+    
+    return {
+      startDate: startDate.toISOString().split('T')[0],
+      endDate: endDate.toISOString().split('T')[0]
+    }
+  }
+  
   const [params, setParams] = useState({
-    startDate: new Date(Date.now() - (environment === 'Sandbox' ? 30 : 180) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0],
-    notificationType: '',  // Changed from array to single string
+    ...getDefaultDateRange(),
+    notificationType: '',
     transactionId: ''
   })
 
@@ -22,10 +38,54 @@ export default function NotificationHistory({ environment }: NotificationHistory
   useEffect(() => {
     setParams(prev => ({
       ...prev,
-      startDate: new Date(Date.now() - (environment === 'Sandbox' ? 30 : 180) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      endDate: new Date().toISOString().split('T')[0],
+      ...getDefaultDateRange()
     }))
   }, [environment])
+  
+  // Validate and normalize date range
+  const validateDateRange = (start: string, end: string): { startDate: string, endDate: string } => {
+    let startMs = new Date(start + 'T00:00:00.000Z').getTime()
+    let endMs = new Date(end + 'T23:59:59.999Z').getTime()
+    
+    // Swap if end < start
+    if (endMs < startMs) {
+      const temp = startMs
+      startMs = endMs
+      endMs = temp
+    }
+    
+    // Clamp end date to today if it's in the future
+    const todayEnd = new Date()
+    todayEnd.setUTCHours(23, 59, 59, 999)
+    const todayEndMs = todayEnd.getTime()
+    
+    if (endMs > todayEndMs) {
+      endMs = todayEndMs
+    }
+    
+    // Ensure range doesn't exceed 180 days
+    const maxRangeMs = 180 * 24 * 60 * 60 * 1000 - 1 // 180 days minus 1ms
+    if (endMs - startMs > maxRangeMs) {
+      startMs = endMs - maxRangeMs
+    }
+    
+    return {
+      startDate: new Date(startMs).toISOString().split('T')[0],
+      endDate: new Date(endMs).toISOString().split('T')[0]
+    }
+  }
+  
+  // Handle date changes with validation
+  const handleDateChange = (field: 'startDate' | 'endDate', value: string) => {
+    const newDates = field === 'startDate' 
+      ? validateDateRange(value, params.endDate)
+      : validateDateRange(params.startDate, value)
+    
+    setParams(prev => ({
+      ...prev,
+      ...newDates
+    }))
+  }
 
   const handleFetch = async () => {
     setLoading(true)
@@ -100,11 +160,68 @@ export default function NotificationHistory({ environment }: NotificationHistory
     <div className="bg-white rounded-lg shadow p-6">
       <h2 className="text-lg font-semibold mb-4">Apple Notification History</h2>
       <p className="text-sm text-gray-600 mb-4">
-        Query notification history directly from Apple 
-        ({environment === 'Sandbox' ? 'Sandbox: Last 30 days recommended' : 'Production: Up to 180 days available'})
+        Query notification history directly from Apple (Default: Last 30 days, Maximum: 180 days)
       </p>
 
       <div className="space-y-4">
+        {/* Quick date range presets */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              const range = getDefaultDateRange()
+              setParams(prev => ({ ...prev, ...range }))
+            }}
+            className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+          >
+            Last 30 Days
+          </button>
+          <button
+            onClick={() => {
+              const endDate = new Date()
+              endDate.setUTCHours(23, 59, 59, 999)
+              const startDate = new Date(endDate.getTime() - (7 * 24 * 60 * 60 * 1000 - 1))
+              setParams(prev => ({
+                ...prev,
+                startDate: startDate.toISOString().split('T')[0],
+                endDate: endDate.toISOString().split('T')[0]
+              }))
+            }}
+            className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+          >
+            Last 7 Days
+          </button>
+          <button
+            onClick={() => {
+              const endDate = new Date()
+              endDate.setUTCHours(23, 59, 59, 999)
+              const startDate = new Date(endDate.getTime() - (90 * 24 * 60 * 60 * 1000 - 1))
+              setParams(prev => ({
+                ...prev,
+                startDate: startDate.toISOString().split('T')[0],
+                endDate: endDate.toISOString().split('T')[0]
+              }))
+            }}
+            className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+          >
+            Last 90 Days
+          </button>
+          <button
+            onClick={() => {
+              const endDate = new Date()
+              endDate.setUTCHours(23, 59, 59, 999)
+              const startDate = new Date(endDate.getTime() - (180 * 24 * 60 * 60 * 1000 - 1))
+              setParams(prev => ({
+                ...prev,
+                startDate: startDate.toISOString().split('T')[0],
+                endDate: endDate.toISOString().split('T')[0]
+              }))
+            }}
+            className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+          >
+            Max (180 Days)
+          </button>
+        </div>
+        
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -113,18 +230,13 @@ export default function NotificationHistory({ environment }: NotificationHistory
             <input
               type="date"
               value={params.startDate}
-              onChange={(e) => setParams({ ...params, startDate: e.target.value })}
+              onChange={(e) => handleDateChange('startDate', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              max={new Date().toISOString().split('T')[0]}
             />
-            {environment === 'Sandbox' ? (
-              <p className="text-xs text-gray-500 mt-1">
-                Sandbox environment: Recommended to query within 30 days for better data availability.
-              </p>
-            ) : (
-              <p className="text-xs text-gray-500 mt-1">
-                Production environment: Apple returns up to 180 days of notification history.
-              </p>
-            )}
+            <p className="text-xs text-gray-500 mt-1">
+              Date range is automatically adjusted to stay within 180-day limit
+            </p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -133,11 +245,25 @@ export default function NotificationHistory({ environment }: NotificationHistory
             <input
               type="date"
               value={params.endDate}
-              onChange={(e) => setParams({ ...params, endDate: e.target.value })}
+              onChange={(e) => handleDateChange('endDate', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              max={new Date().toISOString().split('T')[0]}
             />
           </div>
         </div>
+        
+        {/* Display calculated date range */}
+        {params.startDate && params.endDate && (
+          <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
+            <span className="font-medium">Query Range: </span>
+            {(() => {
+              const start = new Date(params.startDate + 'T00:00:00.000Z')
+              const end = new Date(params.endDate + 'T23:59:59.999Z')
+              const days = Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000))
+              return `${days} days (${start.toLocaleDateString()} to ${end.toLocaleDateString()})`
+            })()}
+          </div>
+        )}
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
