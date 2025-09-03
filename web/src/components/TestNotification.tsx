@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { AppleEnvironment } from '@/lib/apple'
+import { callEdgeFunction } from '@/lib/edge-functions'
 
 interface TestNotificationProps {
   environment: AppleEnvironment
@@ -19,16 +20,13 @@ export default function TestNotification({ environment }: TestNotificationProps)
     setTestResult(null)
     
     try {
-      const response = await fetch('/api/test-webhook', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ environment })
-      })
-
-      const data = await response.json()
-      setTestResult(data)
+      const { data, error } = await callEdgeFunction('test-webhook', { environment })
+      
+      if (error) {
+        setTestResult({ error: error.message })
+      } else {
+        setTestResult(data)
+      }
       
       if (data.testNotificationToken) {
         setStatusToken(data.testNotificationToken)
@@ -50,19 +48,16 @@ export default function TestNotification({ environment }: TestNotificationProps)
     setStatusResult(null)
     
     try {
-      const response = await fetch('/api/test-webhook/status', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          testNotificationToken: statusToken,
-          environment 
-        })
+      const { data, error } = await callEdgeFunction('test-webhook-status', { 
+        testNotificationToken: statusToken,
+        environment 
       })
-
-      const data = await response.json()
-      setStatusResult(data)
+      
+      if (error) {
+        setStatusResult({ error: error.message })
+      } else {
+        setStatusResult(data)
+      }
     } catch (error) {
       setStatusResult({ 
         error: error instanceof Error ? error.message : 'Status check failed' 

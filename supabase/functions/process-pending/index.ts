@@ -1,43 +1,45 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServiceSupabase } from '@/lib/supabase'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
+import { corsHeaders } from '../_shared/cors.ts'
+import { requireAuth } from '../_shared/auth.ts'
 
-export async function POST(request: NextRequest) {
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
   try {
-    // Get the user's session
-    const cookieStore = await cookies()
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value
-          },
-        },
-      }
-    )
-    const { data: { session } } = await supabase.auth.getSession()
-    
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
+    // Verify authentication
+    const authResult = await requireAuth(req)
+    if (authResult.error) {
+      return authResult.error
+    }
+    const { supabase, user } = authResult
+
+    if (req.method !== 'POST') {
+      return new Response(
+        JSON.stringify({ error: 'Method not allowed' }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 405
+        }
       )
     }
-    
-    const body = await request.json()
+
+    const body = await req.json()
     const { limit = 50, source } = body
     
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const userToken = session.access_token
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const authHeader = req.headers.get('Authorization')!
     
     console.log(`Processing pending notifications: limit=${limit}, source=${source || 'all'}`)
     
-    // Get count of pending notifications
-    const serviceSupabase = await getServiceSupabase()
-    let countQuery = serviceSupabase
+    // Get count of pending notifications using service role for accurate count
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+    
+    let countQuery = supabaseAdmin
       .from('notifications_raw')
       .select('id', { count: 'exact', head: true })
       .eq('status', 'pending')
@@ -55,12 +57,18 @@ export async function POST(request: NextRequest) {
     console.log(`Found ${count || 0} pending notifications`)
     
     if (!count || count === 0) {
-      return NextResponse.json({
-        success: true,
-        message: 'No pending notifications to process',
-        processed: 0,
-        total: 0
-      })
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'No pending notifications to process',
+          processed: 0,
+          total: 0
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200
+        }
+      )
     }
     
     // Calculate number of batches needed
@@ -77,7 +85,7 @@ export async function POST(request: NextRequest) {
         const response = await fetch(`${supabaseUrl}/functions/v1/process-notifications`, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${userToken}`,
+            'Authorization': authHeader,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
@@ -129,27 +137,36 @@ export async function POST(request: NextRequest) {
       .filter(r => r.success)
       .reduce((sum, r) => sum + (r.failed || 0), 0)
     
-    return NextResponse.json({
-      success: true,
-      message: `Processing triggered for ${count} notifications`,
-      batches: batches,
-      results: results,
-      summary: {
-        total: count,
-        processed: totalProcessed,
-        failed: totalFailed,
-        pending: count - totalProcessed - totalFailed
-      }
-    })
-    
-  } catch (error: any) {
-    console.error('Error triggering notification processing:', error)
-    return NextResponse.json(
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: `Processing triggered for ${count} notifications`,
+        batches: batches,
+        results: results,
+        summary: {
+          total: count,
+          processed: totalProcessed,
+          failed: totalFailed,
+          pending: count - totalProcessed - totalFailed
+        }
+      }),
       { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
+      }
+    )
+    
+  } catch (error) {
+    console.error('Error in process-pending function:', error)
+    return new Response(
+      JSON.stringify({ 
         success: false,
-        error: error.message || 'Failed to process notifications' 
-      },
-      { status: 500 }
+        error: error.message || 'Failed to process notifications'
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500
+      }
     )
   }
-}
+})

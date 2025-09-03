@@ -1,20 +1,32 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 
-export async function POST(request: Request) {
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
   try {
-    const { requestId, jobId } = await request.json()
+    const { requestId, jobId } = await req.json()
     
     if (!requestId && !jobId) {
-      return NextResponse.json(
-        { error: 'Either requestId or jobId is required' },
-        { status: 400 }
+      return new Response(
+        JSON.stringify({ error: 'Either requestId or jobId is required' }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400
+        }
       )
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-    
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     let targetJobId = jobId
@@ -105,38 +117,40 @@ export async function POST(request: Request) {
     
     if (!response.ok) {
       console.error('Edge Function error:', result)
-      return NextResponse.json(
+      return new Response(
+        JSON.stringify({ 
+          error: result.error || 'Failed to resend consumption data',
+          details: result
+        }),
         { 
-          error: result.error || 'Failed to send consumption data',
-          details: result.details,
-          requestId: result.requestId
-        },
-        { status: response.status }
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: response.status
+        }
       )
     }
 
-    // Update consumption request status based on result
-    if (requestId && result.results && result.results.length > 0) {
-      const jobResult = result.results[0]
-      await supabase
-        .from('consumption_requests')
-        .update({
-          status: jobResult.success ? 'sent' : 'pending',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', requestId)
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Consumption data resent to Apple',
-      result
-    })
-  } catch (error: any) {
-    console.error('Error resending consumption data:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to resend consumption data' },
-      { status: 500 }
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: 'Consumption data resent successfully',
+        jobId: targetJobId,
+        result: result
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
+      }
+    )
+  } catch (error) {
+    console.error('Error resending consumption:', error)
+    return new Response(
+      JSON.stringify({ 
+        error: error.message || 'Failed to resend consumption data'
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500
+      }
     )
   }
-}
+})

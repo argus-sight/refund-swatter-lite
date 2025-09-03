@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { AppleEnvironment } from '@/lib/apple'
+import { supabase } from '@/lib/supabase'
 
 interface NotificationHistoryProps {
   environment: AppleEnvironment
@@ -93,9 +94,16 @@ export default function NotificationHistory({ environment }: NotificationHistory
     setResult(null)
 
     try {
-      const response = await fetch('/api/apple-notification-history', {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        throw new Error('No session available')
+      }
+      
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const response = await fetch(`${supabaseUrl}/functions/v1/apple-notification-history`, {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({

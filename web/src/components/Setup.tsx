@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { updateInEdgeFunction, callEdgeFunction } from '@/lib/edge-functions'
 
 interface SetupProps {
   onSetupComplete: () => void
@@ -20,38 +21,26 @@ export default function Setup({ onSetupComplete }: SetupProps) {
     setError('')
 
     try {
-      // Update config via API
-      const configResponse = await fetch('/api/config', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          bundle_id: bundleId,
-          apple_issuer_id: issuerId,
-          apple_key_id: keyId,
-          refund_preference: 0, // Default to undeclared
-          updated_at: new Date().toISOString()
-        })
+      // Update config via Edge Function
+      const { error: configError } = await updateInEdgeFunction('config', {
+        bundle_id: bundleId,
+        apple_issuer_id: issuerId,
+        apple_key_id: keyId,
+        refund_preference: 0, // Default to undeclared
+        updated_at: new Date().toISOString()
       })
 
-      if (!configResponse.ok) {
-        const errorData = await configResponse.json()
-        throw new Error(errorData.error || 'Failed to update config')
+      if (configError) {
+        throw new Error(configError.message || 'Failed to update config')
       }
 
-      // Store private key in vault
-      const response = await fetch('/api/setup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ privateKey })
+      // Store private key via Edge Function
+      const { error: setupError } = await callEdgeFunction('store-apple-key', {
+        privateKey
       })
 
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to store private key')
+      if (setupError) {
+        throw new Error(setupError.message || 'Failed to store private key')
       }
 
       onSetupComplete()

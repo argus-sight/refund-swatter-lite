@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { callEdgeFunction } from '@/lib/edge-functions'
 
 export default function ProcessPendingButton() {
   const [processing, setProcessing] = useState(false)
@@ -11,19 +12,19 @@ export default function ProcessPendingButton() {
     setResult(null)
     
     try {
-      const response = await fetch('/api/process-pending', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          limit: 100, // Process up to 100 notifications
-          source: 'history_api' // Only process history API imports
-        })
+      const { data, error } = await callEdgeFunction('process-pending', {
+        limit: 100, // Process up to 100 notifications
+        source: 'history_api' // Only process history API imports
       })
 
-      const data = await response.json()
-      setResult(data)
+      if (error) {
+        setResult({ 
+          success: false, 
+          error: error.message
+        })
+      } else {
+        setResult(data)
+      }
     } catch (error) {
       setResult({ 
         success: false, 

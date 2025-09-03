@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { AppleEnvironment } from '@/lib/apple'
+import { supabase } from '@/lib/supabase'
 
 interface RefundHistoryProps {
   environment: AppleEnvironment
@@ -24,9 +25,16 @@ export default function RefundHistory({ environment }: RefundHistoryProps) {
     setResult(null)
 
     try {
-      const response = await fetch('/api/apple-refund-history', {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        throw new Error('No session available')
+      }
+      
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const response = await fetch(`${supabaseUrl}/functions/v1/apple-refund-history`, {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({

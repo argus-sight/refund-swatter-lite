@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { AppleEnvironment } from '@/lib/apple'
+import { supabase } from '@/lib/supabase'
 import ConsumptionRequestModal from './ConsumptionRequestModal'
 
 interface ConsumptionRequestHistoryProps {
@@ -44,18 +45,31 @@ export default function ConsumptionRequestHistory({ environment }: ConsumptionRe
   const loadRequests = async () => {
     try {
       setLoading(true)
-      let url = '/api/consumption-requests?limit=100'
+      
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        throw new Error('No session available')
+      }
+      
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const params = new URLSearchParams({ limit: '100' })
       
       if (statusFilter !== 'all') {
-        url += `&status=${statusFilter}`
+        params.append('status', statusFilter)
       }
       
       // Always filter by the environment passed from Dashboard
       if (environment) {
-        url += `&environment=${environment}`
+        params.append('environment', environment)
       }
 
-      const response = await fetch(url)
+      const response = await fetch(`${supabaseUrl}/functions/v1/consumption-requests?${params.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        }
+      })
+      
       if (!response.ok) {
         throw new Error('Failed to fetch consumption requests')
       }

@@ -10,6 +10,8 @@ import NotificationHistory from './tools/NotificationHistory'
 import RefundHistory from './tools/RefundHistory'
 import ConsumptionRequestHistory from './tools/ConsumptionRequestHistory'
 import ManualReprocess from './tools/ManualReprocess'
+import { getFromEdgeFunction, updateInEdgeFunction } from '@/lib/edge-functions'
+import { supabase } from '@/lib/supabase'
 import { 
   Cog6ToothIcon, 
   DocumentTextIcon, 
@@ -41,14 +43,11 @@ export default function Dashboard() {
 
   const loadConfig = async () => {
     try {
-      const response = await fetch('/api/config')
-      if (response.ok) {
-        const data = await response.json()
-        if (data) {
-          setConfig(data)
-        }
-      } else {
-        console.error('Failed to load config')
+      const { data, error } = await getFromEdgeFunction('config')
+      if (error) {
+        console.error('Failed to load config:', error)
+      } else if (data) {
+        setConfig(data)
       }
     } catch (error) {
       console.error('Error loading config:', error)
@@ -58,7 +57,20 @@ export default function Dashboard() {
 
   const loadStats = async (env: AppleEnvironment) => {
     try {
-      const response = await fetch(`/api/consumption-metrics?environment=${env}`)
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
+        console.error('No session available')
+        return
+      }
+      
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const response = await fetch(`${supabaseUrl}/functions/v1/consumption-metrics?environment=${env}`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
+      
       if (response.ok) {
         const data = await response.json()
         setStats(data)
@@ -81,23 +93,15 @@ export default function Dashboard() {
     try {
       console.log('Updating refund preference to:', value)
       
-      const response = await fetch('/api/config', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          refund_preference: value,
-          updated_at: new Date().toISOString()
-        })
+      const { data, error } = await updateInEdgeFunction('config', {
+        refund_preference: value,
+        updated_at: new Date().toISOString()
       })
       
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to update config')
+      if (error) {
+        throw new Error(error.message || 'Failed to update config')
       }
       
-      const data = await response.json()
       console.log('Update successful, returned data:', data)
       
       // Update local config

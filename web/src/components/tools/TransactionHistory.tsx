@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { AppleEnvironment } from '@/lib/apple'
+import { supabase } from '@/lib/supabase'
 
 interface TransactionHistoryProps {
   environment: AppleEnvironment
@@ -25,9 +26,16 @@ export default function TransactionHistory({ environment }: TransactionHistoryPr
     setResult(null)
 
     try {
-      const response = await fetch('/api/apple-transaction-history', {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        throw new Error('No session available')
+      }
+      
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const response = await fetch(`${supabaseUrl}/functions/v1/apple-transaction-history`, {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({

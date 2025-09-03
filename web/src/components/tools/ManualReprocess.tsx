@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { AppleEnvironment } from '@/lib/apple'
 import { ArrowPathIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline'
+import { callEdgeFunction } from '@/lib/edge-functions'
 
 interface ManualReprocessProps {
   environment: AppleEnvironment
@@ -36,19 +37,16 @@ export default function ManualReprocess({ environment }: ManualReprocessProps) {
     setResult(null)
 
     try {
-      const response = await fetch('/api/reprocess-notification', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          notification_uuid: notificationUuid.trim(),
-        }),
+      const { data, error } = await callEdgeFunction('reprocess-notification', {
+        notification_uuid: notificationUuid.trim(),
       })
 
-      const data = await response.json()
-
-      if (response.ok) {
+      if (error) {
+        setResult({
+          success: false,
+          message: error.message || 'Failed to reprocess notification'
+        })
+      } else {
         setResult({
           success: true,
           message: data.message || 'Notification reprocessed successfully',
@@ -56,11 +54,6 @@ export default function ManualReprocess({ environment }: ManualReprocessProps) {
         })
         // Clear input after successful processing
         setNotificationUuid('')
-      } else {
-        setResult({
-          success: false,
-          message: data.error || data.message || 'Failed to reprocess notification',
-        })
       }
     } catch (error) {
       console.error('Error reprocessing notification:', error)

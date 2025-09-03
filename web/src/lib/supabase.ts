@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { createBrowserClient } from '@supabase/ssr'
 
 // Create client lazily to avoid build-time errors
 export const supabase = (() => {
@@ -13,17 +13,5 @@ export const supabase = (() => {
     throw new Error('Missing Supabase environment variables')
   }
   
-  return createClient(supabaseUrl, supabaseAnonKey)
+  return createBrowserClient(supabaseUrl, supabaseAnonKey)
 })()
-
-export async function getServiceSupabase() {
-  const { createClient } = await import('@supabase/supabase-js')
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error('Missing Supabase service environment variables')
-  }
-  
-  return createClient(supabaseUrl, supabaseServiceKey)
-}
