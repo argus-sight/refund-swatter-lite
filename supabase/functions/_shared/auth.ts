@@ -86,7 +86,9 @@ export async function verifyAuth(
 
     // If admin is required, check admin status
     if (requireAdmin) {
-      const { data: adminUser, error: adminError } = await supabase
+      // Use service role client to check admin status (bypasses RLS)
+      const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+      const { data: adminUser, error: adminError } = await supabaseAdmin
         .from('admin_users')
         .select('id')
         .eq('id', user.id)
