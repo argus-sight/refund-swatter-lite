@@ -4,6 +4,12 @@
 
 基于 Supabase 的简化版单租户 Apple App Store 退款预防服务。
 
+## 演示视频
+
+[![RefundSwatterLite Demo](https://img.youtube.com/vi/j-88H8j7btI/maxresdefault.jpg)](https://www.youtube.com/watch?v=j-88H8j7btI)
+
+观看 [完整的设置和使用教程](https://www.youtube.com/watch?v=j-88H8j7btI) (YouTube)。
+
 ## 概述
 
 Refund Swatter Lite 处理 Apple 的 CONSUMPTION_REQUEST 通知，并在规定的 12 小时窗口内将消费信息发送回 Apple，帮助减少欺诈性退款。

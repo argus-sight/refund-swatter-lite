@@ -4,6 +4,12 @@
 
 Simplified single-tenant Apple App Store refund prevention service using Supabase.
 
+## Demo Video
+
+[![RefundSwatterLite Demo](https://img.youtube.com/vi/j-88H8j7btI/maxresdefault.jpg)](https://www.youtube.com/watch?v=j-88H8j7btI)
+
+Watch the [complete setup and usage tutorial](https://www.youtube.com/watch?v=j-88H8j7btI) on YouTube.
+
 ## Overview
 
 Refund Swatter Lite processes Apple's CONSUMPTION_REQUEST notifications and sends consumption information back to Apple within the required 12-hour window, helping reduce fraudulent refunds.
