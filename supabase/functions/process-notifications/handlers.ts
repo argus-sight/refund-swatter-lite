@@ -20,7 +20,7 @@ export async function processRefund(supabase: any, notification: any, transactio
   const { error } = await supabase
     .from('refunds')
     .upsert(refundData, { 
-      onConflict: 'transaction_id',
+      onConflict: 'transaction_id,refund_date',
       ignoreDuplicates: true 
     })
 
