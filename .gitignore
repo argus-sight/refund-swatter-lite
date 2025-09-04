@@ -27,3 +27,6 @@ volumes/
 supabase/.temp/
 supabase/.branches
 supabase/.env
+
+# Development documentation (not for public)
+docs/
