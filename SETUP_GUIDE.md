@@ -22,7 +22,7 @@ SETUP_CRON=true
 The `setup-simple.sh` script handles everything:
 
 1. **Database Setup**
-   - Enables required extensions (pg_cron, pg_net, vault)
+   - Enables required extensions (pg_cron, pg_net, supabase_vault)
    - Applies all migrations
    - Creates necessary tables and functions
 
@@ -127,7 +127,6 @@ SELECT cron.schedule(
 Required for Vercel deployment:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
 - `CRON_SECRET`
 
 ### Deploy Command
@@ -190,21 +189,7 @@ LIMIT 100;
 ```
 
 ## Consumption Fields Reference
-
-| Field | Type | Description |
-|-------|------|-------------|
-| accountTenure | Days | Time since first purchase |
-| appAccountToken | UUID | User identifier |
-| consumptionStatus | Enum | 0=Undeclared, 1=NotConsumed, 2=PartiallyConsumed, 3=FullyConsumed |
-| customerConsented | Bool | User consent status |
-| deliveryStatus | Enum | 0=NotDelivered, 1=Delivered |
-| lifetimeDollarsPurchased | Enum | Purchase amount range |
-| lifetimeDollarsRefunded | Enum | Refund amount range |
-| platform | Enum | 1=Apple |
-| playTime | Enum | Usage time range |
-| refundPreference | Enum | 0=Undeclared, 1=NoRefunds, 2=FewRefunds, 3=SomeRefunds, 4=ManyRefunds |
-| sampleContentProvided | Bool | Free content status |
-| userStatus | Enum | 0=Undeclared, 1=ActiveSubscriber, 2=SuspendedSubscriber, 3=NotSubscriber |
+https://developer.apple.com/documentation/appstoreserverapi/consumptionrequest
 
 ## Support
 
