@@ -50,16 +50,19 @@ serve(async (req) => {
       )
     }
 
-    if (req.method === 'PUT') {
+    if (req.method === 'POST' || req.method === 'PUT') {
       // Update config
       const body = await req.json()
+      
+      // Remove the action field if it exists (used for routing but not needed in DB)
+      const { action, ...configData } = body
       
       // Use UPSERT to handle both insert and update cases
       const { data, error } = await supabase
         .from('config')
         .upsert({
           id: 1,
-          ...body
+          ...configData
         })
         .eq('id', 1)
         .select()

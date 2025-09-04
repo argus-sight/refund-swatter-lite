@@ -4,23 +4,17 @@ import { useState, useEffect } from 'react'
 import { AppleEnvironment } from '@/lib/apple'
 import NotificationList from './NotificationList'
 import ConsumptionMetrics from './ConsumptionMetrics'
-import DataInitialization from './DataInitialization'
-import TestNotification from './TestNotification'
-import NotificationHistory from './tools/NotificationHistory'
-import RefundHistory from './tools/RefundHistory'
+import GuidedSetup from './GuidedSetup'
+import Tools from './Tools'
 import ConsumptionRequestHistory from './tools/ConsumptionRequestHistory'
-import ManualReprocess from './tools/ManualReprocess'
-import { getFromEdgeFunction, updateInEdgeFunction } from '@/lib/edge-functions'
+import { getFromEdgeFunction } from '@/lib/edge-functions'
 import { supabase } from '@/lib/supabase'
 import { 
   Cog6ToothIcon, 
-  DocumentTextIcon, 
-  BeakerIcon,
-  ArrowPathIcon,
-  ClockIcon,
+  DocumentTextIcon,
   ChartBarIcon,
-  PaperAirplaneIcon,
-  ArrowUturnLeftIcon
+  WrenchScrewdriverIcon,
+  PaperAirplaneIcon
 } from '@heroicons/react/24/outline'
 
 export default function Dashboard() {
@@ -29,7 +23,6 @@ export default function Dashboard() {
   const [config, setConfig] = useState<any>(null)
   const [stats, setStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [savingRefundPreference, setSavingRefundPreference] = useState(false)
 
   useEffect(() => {
     loadConfig()
@@ -84,49 +77,21 @@ export default function Dashboard() {
 
   const handleEnvironmentChange = (newEnv: AppleEnvironment) => {
     setEnvironment(newEnv)
-    // Environment is now just a view-level filter
-    // No need to save to database
   }
 
-  const handleRefundPreferenceChange = async (value: number) => {
-    setSavingRefundPreference(true)
-    try {
-      console.log('Updating refund preference to:', value)
-      
-      const { data, error } = await updateInEdgeFunction('config', {
-        refund_preference: value,
-        updated_at: new Date().toISOString()
-      })
-      
-      if (error) {
-        throw new Error(error.message || 'Failed to update config')
-      }
-      
-      console.log('Update successful, returned data:', data)
-      
-      // Update local config
-      setConfig({ ...config, refund_preference: value })
-      
-      // Show success message
-      console.log('Refund preference updated successfully to:', value)
-    } catch (error: any) {
-      console.error('Failed to update refund preference - Full error:', error)
-      const errorMessage = error?.message || 'Failed to update refund preference'
-      alert(`Error: ${errorMessage}\n\nPlease check the browser console for details.`)
-    } finally {
-      setSavingRefundPreference(false)
-    }
+  const handleSetupComplete = () => {
+    // Reload config after setup is complete
+    loadConfig()
+    // Stay on setup tab or navigate to overview
+    setActiveTab('overview')
   }
 
   const tabs = [
     { id: 'overview', name: 'Overview', icon: ChartBarIcon },
+    { id: 'setup', name: 'Setup', icon: Cog6ToothIcon },
     { id: 'notifications', name: 'Notifications', icon: DocumentTextIcon },
-    { id: 'test', name: 'Test & Initialize', icon: BeakerIcon },
-    { id: 'notification-history', name: 'Notification History', icon: ClockIcon },
     { id: 'consumption-requests', name: 'Consumption Requests', icon: PaperAirplaneIcon },
-    { id: 'refund-history', name: 'Refund History', icon: ArrowPathIcon },
-    { id: 'manual-reprocess', name: 'Manual Reprocess', icon: ArrowUturnLeftIcon },
-    { id: 'settings', name: 'Settings', icon: Cog6ToothIcon },
+    { id: 'tools', name: 'Tools', icon: WrenchScrewdriverIcon },
   ]
 
   if (loading) {
@@ -218,135 +183,20 @@ export default function Dashboard() {
           </div>
         )}
 
+        {activeTab === 'setup' && (
+          <GuidedSetup onSetupComplete={handleSetupComplete} />
+        )}
+
         {activeTab === 'notifications' && (
           <NotificationList environment={environment} />
-        )}
-
-        {activeTab === 'test' && (
-          <div className="space-y-6">
-            <TestNotification environment={environment} />
-            <DataInitialization environment={environment} onComplete={() => loadStats(environment)} />
-          </div>
-        )}
-
-        {activeTab === 'notification-history' && (
-          <NotificationHistory environment={environment} />
-        )}
-
-        {activeTab === 'refund-history' && (
-          <RefundHistory environment={environment} />
         )}
 
         {activeTab === 'consumption-requests' && (
           <ConsumptionRequestHistory environment={environment} />
         )}
 
-        {activeTab === 'manual-reprocess' && (
-          <ManualReprocess environment={environment} />
-        )}
-
-        {activeTab === 'settings' && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold mb-4">Settings</h2>
-            <div className="space-y-6">
-              {/* Refund Preference Setting */}
-              <div className="border-b pb-6">
-                <h3 className="text-sm font-medium text-gray-700 mb-2">Refund Preference</h3>
-                <p className="text-xs text-gray-500 mb-3">
-                  Configure your default preference for refund requests. This helps Apple's refund decision process.
-                </p>
-                <select
-                  value={config?.refund_preference || 0}
-                  onChange={(e) => handleRefundPreferenceChange(parseInt(e.target.value))}
-                  disabled={savingRefundPreference}
-                  className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
-                >
-                  <option value={0}>Undeclared (Don't provide preference)</option>
-                  <option value={1}>Prefer Grant Refund</option>
-                  <option value={2}>Prefer Decline Refund</option>
-                  <option value={3}>No Preference</option>
-                </select>
-                {savingRefundPreference && (
-                  <span className="ml-2 text-xs text-gray-500">Saving...</span>
-                )}
-                <div className="mt-2 p-3 bg-blue-50 rounded-md">
-                  <p className="text-xs text-blue-700">
-                    <strong>Note:</strong> This is just a preference and one of many factors Apple considers. 
-                    The actual refund decision is made by Apple based on multiple criteria.
-                  </p>
-                </div>
-              </div>
-
-              {/* Delivery Status Note */}
-              <div className="border-b pb-6">
-                <h3 className="text-sm font-medium text-gray-700 mb-2">Delivery Status</h3>
-                <div className="p-3 bg-green-50 rounded-md">
-                  <p className="text-xs text-green-700">
-                    <strong>Default:</strong> All consumption requests report delivery status as "Successfully delivered and working properly" (status: 0).
-                  </p>
-                  <p className="text-xs text-green-700 mt-1">
-                    You are responsible for ensuring successful delivery of purchased items before the consumption data is sent to Apple.
-                  </p>
-                </div>
-              </div>
-
-              {/* Consumption Status Note */}
-              <div className="border-b pb-6">
-                <h3 className="text-sm font-medium text-gray-700 mb-2">Consumption Status</h3>
-                <div className="p-3 bg-yellow-50 rounded-md">
-                  <p className="text-xs text-yellow-700">
-                    <strong>Default:</strong> Returns "Undeclared" (status: 0) when consumption data cannot be determined.
-                  </p>
-                  <p className="text-xs text-yellow-700 mt-1">
-                    <strong>Current Logic:</strong> Simplified implementation - returns 0 (undeclared), 1 (not consumed for active subscriptions), or 2 (partially consumed if content accessed).
-                  </p>
-                  <p className="text-xs text-yellow-700 mt-1">
-                    <strong>Note:</strong> Apple does not provide consumption tracking via notifications. To accurately track consumption, you need to implement usage tracking in your app and store it in the usage_metrics table.
-                  </p>
-                </div>
-              </div>
-
-              {/* User Status Note */}
-              <div className="border-b pb-6">
-                <h3 className="text-sm font-medium text-gray-700 mb-2">User Status</h3>
-                <div className="p-3 bg-yellow-50 rounded-md">
-                  <p className="text-xs text-yellow-700">
-                    <strong>Default:</strong> Returns "Undeclared" (status: 0) for users without purchases, or "Active" (status: 1) for users with purchases.
-                  </p>
-                  <p className="text-xs text-yellow-700 mt-1">
-                    <strong>Apple Values:</strong> 0=Undeclared, 1=Active, 2=Suspended, 3=Terminated, 4=Limited Access
-                  </p>
-                  <p className="text-xs text-yellow-700 mt-1">
-                    <strong>Note:</strong> To properly track user account status (suspended/terminated/limited), you need to implement an account management system in your app.
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-2">Webhook URL</h3>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="text"
-                    value={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/webhook`}
-                    readOnly
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm font-mono bg-gray-50"
-                  />
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/webhook`)
-                    }}
-                    className="px-3 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700"
-                  >
-                    Copy
-                  </button>
-                </div>
-                <p className="mt-2 text-xs text-gray-500">
-                  Configure this URL in App Store Connect for Server-to-Server Notifications
-                </p>
-              </div>
-
-            </div>
-          </div>
+        {activeTab === 'tools' && (
+          <Tools environment={environment} />
         )}
       </div>
     </div>

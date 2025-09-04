@@ -168,16 +168,111 @@ export default function TestNotification({ environment }: TestNotificationProps)
                 
                 {result.sendAttempts && result.sendAttempts.length > 0 && (
                   <div className="mt-3 pt-3 border-t border-gray-200">
-                    <p className="text-xs text-gray-600">
-                      Delivery attempts: {result.sendAttempts.length}
+                    <p className="text-xs text-gray-600 font-semibold">
+                      Delivery Attempts: {result.sendAttempts.length}
                     </p>
                     {result.sendAttempts.map((attempt: any, index: number) => (
-                      <div key={index} className="mt-1">
-                        <p className="text-xs text-gray-500">
-                          • {new Date(attempt.attemptDate).toLocaleString()} - {attempt.responseStatusCode || 'N/A'}
+                      <div key={index} className="mt-1 pl-3">
+                        <p className="text-xs text-gray-600">
+                          Attempt #{index + 1}
                         </p>
+                        <p className="text-xs text-gray-500">
+                          Time: {new Date(attempt.attemptDate).toLocaleString()}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Result: <span className="font-mono">{attempt.sendAttemptResult || 'N/A'}</span>
+                        </p>
+                        {attempt.responseStatusCode && (
+                          <p className="text-xs text-gray-500">
+                            Response Code: <span className="font-mono">{attempt.responseStatusCode}</span>
+                          </p>
+                        )}
                       </div>
                     ))}
+                  </div>
+                )}
+                
+                {/* JWS Notification Details */}
+                {result.signedPayload && (
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <details className="cursor-pointer">
+                      <summary className="text-xs font-semibold text-gray-700 hover:text-gray-900">
+                        View Notification Details (JWS)
+                      </summary>
+                      <div className="mt-2 space-y-2">
+                        {(() => {
+                          try {
+                            const parts = result.signedPayload.split('.')
+                            if (parts.length === 3) {
+                              const header = JSON.parse(atob(parts[0]))
+                              const payload = JSON.parse(atob(parts[1]))
+                              
+                              return (
+                                <>
+                                  {/* Notification Summary */}
+                                  <div className="bg-white p-2 rounded">
+                                    <p className="text-xs font-semibold text-gray-700 mb-1">Summary:</p>
+                                    <div className="text-xs text-gray-600 space-y-0.5">
+                                      <p>Type: {payload.notificationType || 'N/A'}</p>
+                                      {payload.subtype && <p>Subtype: {payload.subtype}</p>}
+                                      <p>Version: {payload.version || 'N/A'}</p>
+                                      <p>UUID: <span className="font-mono text-xxs">{payload.notificationUUID || 'N/A'}</span></p>
+                                      {payload.signedDate && (
+                                        <p>Signed: {new Date(payload.signedDate).toLocaleString()}</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  
+                                  {/* JWS Header */}
+                                  <details className="bg-white p-2 rounded cursor-pointer">
+                                    <summary className="text-xs text-gray-600 hover:text-gray-900">
+                                      View JWS Header
+                                    </summary>
+                                    <div className="mt-1 p-1 bg-gray-50 rounded">
+                                      <pre className="text-xxs font-mono text-gray-600 overflow-x-auto">
+                                        {JSON.stringify(header, null, 2)}
+                                      </pre>
+                                    </div>
+                                  </details>
+                                  
+                                  {/* Full Payload */}
+                                  <details className="bg-white p-2 rounded cursor-pointer">
+                                    <summary className="text-xs text-gray-600 hover:text-gray-900">
+                                      View Full Decoded Payload
+                                    </summary>
+                                    <div className="mt-1 p-1 bg-gray-50 rounded">
+                                      <pre className="text-xxs font-mono text-gray-600 overflow-x-auto">
+                                        {JSON.stringify(payload, null, 2)}
+                                      </pre>
+                                    </div>
+                                  </details>
+                                  
+                                  {/* Raw JWS */}
+                                  <details className="bg-white p-2 rounded cursor-pointer">
+                                    <summary className="text-xs text-gray-600 hover:text-gray-900">
+                                      View Raw JWS
+                                    </summary>
+                                    <div className="mt-1 p-1 bg-gray-50 rounded">
+                                      <pre className="text-xxs font-mono text-gray-600 whitespace-pre-wrap break-all">
+                                        {result.signedPayload}
+                                      </pre>
+                                    </div>
+                                  </details>
+                                </>
+                              )
+                            }
+                          } catch (e) {
+                            console.error('Failed to parse JWS:', e)
+                            return (
+                              <div className="text-xs text-red-600">
+                                Failed to parse JWS data
+                              </div>
+                            )
+                          }
+                          return null
+                        })()}
+                      </div>
+                    </details>
                   </div>
                 )}
                 

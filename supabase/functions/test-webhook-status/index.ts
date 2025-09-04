@@ -170,7 +170,7 @@ serve(async (req) => {
 
     // Return the data directly, not nested under 'status'
     return new Response(
-      JSON.stringify(data),
+      JSON.stringify(lastData),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200

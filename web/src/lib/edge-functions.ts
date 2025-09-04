@@ -94,7 +94,7 @@ export async function getFromEdgeFunction<T = any>(
 }
 
 /**
- * Helper function to call Edge Functions with PUT method
+ * Helper function to update data via Edge Functions (using POST with action parameter)
  */
 export async function updateInEdgeFunction<T = any>(
   functionName: string,
@@ -118,13 +118,13 @@ export async function updateInEdgeFunction<T = any>(
     const response = await fetch(
       `${supabaseUrl}/functions/v1/${functionName}`,
       {
-        method: 'PUT',
+        method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
           ...options?.headers
         },
-        body: body ? JSON.stringify(body) : undefined
+        body: JSON.stringify({ ...body, action: 'update' })
       }
     )
 
