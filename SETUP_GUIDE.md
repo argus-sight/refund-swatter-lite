@@ -64,6 +64,39 @@ supabase secrets set SUPABASE_SERVICE_ROLE_KEY=your-service-key
 
 ### 4. Configure Cron Job
 
+#### Option A: Via Supabase Dashboard (Recommended)
+
+1. Navigate to Cron Jobs section:
+   ```
+   https://supabase.com/dashboard/project/[YOUR_PROJECT_REF]/integrations/cron-jobs
+   ```
+
+2. Click "Create a new cron job"
+
+3. Configure with these settings:
+   - **Schedule (GMT)**: `*/5 * * * *` (every 5 minutes)
+   - **Type**: Supabase Edge Function
+   - **Method**: POST
+   - **Edge Function**: process-notifications-cron
+   - **Timeout**: 3000 ms
+   
+4. Add HTTP Headers (click "Add a new header" twice):
+   - **Header 1**:
+     - Name: `Authorization`
+     - Value: `Bearer [YOUR_SERVICE_ROLE_KEY]`
+   - **Header 2**:
+     - Name: `Content-Type`
+     - Value: `application/json`
+
+5. Set HTTP Request Body:
+   ```json
+   {"secret": "[YOUR_CRON_SECRET]"}
+   ```
+
+6. Click "Save cron job"
+
+#### Option B: Via SQL (Alternative)
+
 In Supabase Dashboard > SQL Editor:
 ```sql
 SELECT cron.schedule(
@@ -73,14 +106,19 @@ SELECT cron.schedule(
   SELECT net.http_post(
     url := 'https://your-project.supabase.co/functions/v1/process-notifications-cron',
     headers := jsonb_build_object(
-      'Authorization', 'Bearer your-cron-secret',
+      'Authorization', 'Bearer your-service-role-key',
       'Content-Type', 'application/json'
     ),
-    body := jsonb_build_object('scheduled', true)
+    body := jsonb_build_object('secret', 'your-cron-secret')
   ) AS request_id;
   $$
 );
 ```
+
+**Note**: The cron job runs every 5 minutes to:
+- Process pending Apple notifications
+- Send consumption data to Apple
+- Retry failed jobs automatically
 
 ## Vercel Deployment
 

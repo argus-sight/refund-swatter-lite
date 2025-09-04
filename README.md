@@ -28,7 +28,7 @@ Refund Swatter Lite processes Apple's CONSUMPTION_REQUEST notifications and send
 
 1. **Clone and configure**
 ```bash
-git clone <repository>
+git clone git@github.com:argus-sight/refund-swatter-lite.git
 cd refund-swatter-lite
 
 # Configure your project settings
@@ -60,7 +60,6 @@ Access the web dashboard at `http://localhost:3000` and add:
 4. **Set webhook in App Store Connect**
 - Production URL: `https://your-project.supabase.co/functions/v1/webhook`
 - Sandbox URL: `https://your-project.supabase.co/functions/v1/webhook`
-- Enable CONSUMPTION_REQUEST notifications
 
 ## Project Structure
 
@@ -82,34 +81,6 @@ refund-swatter-lite/
 - **Consumption Requests** - Track processing status
 - **Settings** - Manage Apple credentials
 
-## Monitoring
-
-### System Health
-```sql
--- Recent consumption requests
-SELECT * FROM consumption_requests 
-WHERE created_at > NOW() - INTERVAL '24 hours'
-ORDER BY created_at DESC;
-
--- Job processing status
-SELECT status, COUNT(*) 
-FROM send_consumption_jobs
-WHERE created_at > NOW() - INTERVAL '24 hours'
-GROUP BY status;
-```
-
-### Cron Status
-```sql
--- Check cron job
-SELECT * FROM cron.job 
-WHERE jobname = 'process-notifications-cron';
-
--- Recent runs
-SELECT * FROM cron.job_run_details 
-WHERE jobname = 'process-notifications-cron'
-ORDER BY start_time DESC LIMIT 10;
-```
-
 ## Troubleshooting
 
 ### Common Issues
@@ -118,6 +89,7 @@ ORDER BY start_time DESC LIMIT 10;
 - Verify webhook URL in App Store Connect
 - Check Edge Function logs: `supabase functions logs webhook`
 - Ensure Edge Functions are deployed
+- Ensure JWT verification is disabled for webhook Edge Function
 
 **Consumption data not sending**
 - Verify cron job is running
@@ -132,7 +104,7 @@ ORDER BY start_time DESC LIMIT 10;
 ## Security
 
 - Private keys encrypted in Supabase Vault
-- JWT verification for all Apple notifications
+- Authentication verification for all Edge Functions
 - Service role keys never exposed to client
 - CRON_SECRET protects scheduled endpoints
 
