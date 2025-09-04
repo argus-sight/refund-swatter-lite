@@ -150,24 +150,24 @@ DECLARE
     payload_base64 TEXT;
     payload_text TEXT;
 BEGIN
-    -- 分割JWT (header.payload.signature)
+    -- Split JWT (header.payload.signature)
     parts := string_to_array(jwt_token, '.');
     
-    -- 检查是否有3部分
+    -- Check if there are 3 parts
     IF array_length(parts, 1) != 3 THEN
         RETURN NULL;
     END IF;
     
-    -- 获取payload部分 (第二部分)
+    -- Get payload part (second part)
     payload_base64 := parts[2];
     
-    -- Base64解码
-    -- 需要补齐padding
+    -- Base64 decode
+    -- Need to pad for proper decoding
     WHILE length(payload_base64) % 4 != 0 LOOP
         payload_base64 := payload_base64 || '=';
     END LOOP;
     
-    -- 解码并转换为JSON
+    -- Decode and convert to JSON
     payload_text := convert_from(decode(payload_base64, 'base64'), 'UTF8');
     
     RETURN payload_text::JSONB;
@@ -655,7 +655,7 @@ CREATE TABLE IF NOT EXISTS "public"."transactions" (
 ALTER TABLE "public"."transactions" OWNER TO "postgres";
 
 
-COMMENT ON COLUMN "public"."transactions"."original_transaction_id" IS '原始交易ID。对于初次购买，此字段可能为NULL或与transaction_id相同。对于续订，此字段指向初次购买的交易ID。';
+COMMENT ON COLUMN "public"."transactions"."original_transaction_id" IS 'Original transaction ID. For initial purchases, this field may be NULL or same as transaction_id. For renewals, this field points to the initial purchase transaction ID.';
 
 
 
@@ -814,7 +814,7 @@ COMMENT ON COLUMN "public"."notifications_raw"."signed_date" IS 'The signedDate 
 
 
 
-COMMENT ON COLUMN "public"."notifications_raw"."decoded_transaction_info" IS '解码后的交易信息，从signedTransactionInfo JWT中提取';
+COMMENT ON COLUMN "public"."notifications_raw"."decoded_transaction_info" IS 'Decoded transaction information extracted from signedTransactionInfo JWT';
 
 
 

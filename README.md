@@ -1,6 +1,6 @@
 # Refund Swatter Lite
 
-[简体中文](./README_zh.md) | English
+[Chinese](./README_zh.md) | English
 
 Simplified single-tenant Apple App Store refund prevention service using Supabase.
 

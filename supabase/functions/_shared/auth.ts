@@ -1,9 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 export interface AuthOptions {
-  allowServiceRole?: boolean  // 允许service role访问
-  requireAdmin?: boolean      // 要求管理员权限
-  allowAnonymous?: boolean    // 允许匿名访问（默认false）
+  allowServiceRole?: boolean  // Allow service role access
+  requireAdmin?: boolean      // Require admin privileges
+  allowAnonymous?: boolean    // Allow anonymous access (default false)
 }
 
 export interface AuthResult {
