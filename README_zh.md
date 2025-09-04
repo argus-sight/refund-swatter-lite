@@ -112,7 +112,7 @@ refund-swatter-lite/
 
 ## 许可证
 
-Apache License 2.0
+根据 Apache License 2.0 授权，详见 [LICENSE](./LICENSE)。
 
 ## 支持
 
