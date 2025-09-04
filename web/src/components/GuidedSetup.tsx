@@ -73,11 +73,11 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
   const [privateKeyUploaded, setPrivateKeyUploaded] = useState(false)
   
   // Step 3: Webhook
-  const [webhookUrl, setWebhookUrl] = useState(
-    process.env.NEXT_PUBLIC_SUPABASE_URL ? 
-    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/webhook` : 
-    ''
-  )
+  const [webhookUrl, setWebhookUrl] = useState(() => {
+    // Use a function to ensure consistent initial value
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    return supabaseUrl ? `${supabaseUrl}/functions/v1/webhook` : ''
+  })
   const [webhookCopied, setWebhookCopied] = useState(false)
   
   // Step 4: Test Notification
@@ -90,6 +90,10 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
   
   useEffect(() => {
     loadConfig()
+    // Set webhook URL on client side if not already set
+    if (!webhookUrl && process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      setWebhookUrl(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/webhook`)
+    }
   }, [])
 
   const loadConfig = async () => {
@@ -867,8 +871,7 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
               <div className="bg-white border border-gray-200 rounded-lg p-4">
                 <h4 className="text-sm font-semibold text-gray-700">User Status</h4>
                 <p className="mt-1 text-xs text-gray-600">
-                  <strong>Default:</strong> Returns "Undeclared" (0) for users without purchases,
-                  or "Active" (1) for users with purchases.
+                  <strong>Default:</strong> Returns 0 (Undeclared).
                 </p>
                 <p className="mt-1 text-xs text-gray-600">
                   <strong>Apple Values:</strong>
@@ -887,13 +890,21 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
               </div>
 
               <div className="bg-white border border-gray-200 rounded-lg p-4">
-                <h4 className="text-sm font-semibold text-gray-700">Best Practices</h4>
-                <ul className="mt-1 text-xs text-gray-600 space-y-1">
-                  <li>✓ Always verify purchase receipt validity before granting access</li>
-                  <li>✓ Track actual usage in your app for accurate consumption reporting</li>
-                  <li>✓ Implement proper account status management</li>
-                  <li>✓ Test thoroughly in sandbox before going to production</li>
-                  <li>✓ Monitor refund patterns to detect potential fraud</li>
+                <h4 className="text-sm font-semibold text-gray-700">Customer Consent</h4>
+                <p className="mt-1 text-xs text-gray-600">
+                  <strong>Default:</strong> customerConsented is set to <strong>true</strong> for all consumption requests.
+                </p>
+                <p className="mt-1 text-xs text-orange-600">
+                  ⚠️ Important: You must obtain explicit consent from your users before sending their consumption data 
+                  to Apple. This is your responsibility as the developer to ensure compliance with privacy regulations.
+                </p>
+                <p className="mt-1 text-xs text-gray-600">
+                  Consider implementing:
+                </p>
+                <ul className="mt-1 text-xs text-gray-600 list-disc list-inside">
+                  <li>A consent dialog in your app</li>
+                  <li>Clear privacy policy explaining data usage</li>
+                  <li>User preference settings for data sharing</li>
                 </ul>
               </div>
             </div>
