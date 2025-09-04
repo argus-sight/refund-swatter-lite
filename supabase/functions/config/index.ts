@@ -57,13 +57,27 @@ serve(async (req) => {
       // Remove the action field if it exists (used for routing but not needed in DB)
       const { action, ...configData } = body
       
+      // First, get existing config to merge with updates
+      const { data: existingConfig } = await supabase
+        .from('config')
+        .select('*')
+        .eq('id', 1)
+        .single()
+      
+      // Merge existing config with new data
+      const mergedConfig = existingConfig 
+        ? { ...existingConfig, ...configData, id: 1 }
+        : { id: 1, ...configData }
+      
+      // Ensure required fields are not null
+      if (!mergedConfig.bundle_id || !mergedConfig.apple_issuer_id || !mergedConfig.apple_key_id) {
+        throw new Error('Required fields (bundle_id, apple_issuer_id, apple_key_id) cannot be null')
+      }
+      
       // Use UPSERT to handle both insert and update cases
       const { data, error } = await supabase
         .from('config')
-        .upsert({
-          id: 1,
-          ...configData
-        })
+        .upsert(mergedConfig)
         .eq('id', 1)
         .select()
         .single()

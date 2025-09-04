@@ -115,11 +115,30 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
     setLoading(true)
     setError('')
     
+    // Validate required fields
+    if (!bundleId?.trim()) {
+      setError('Bundle ID is required')
+      setLoading(false)
+      return
+    }
+    
+    if (!issuerId?.trim()) {
+      setError('Issuer ID is required')
+      setLoading(false)
+      return
+    }
+    
+    if (!keyId?.trim()) {
+      setError('Key ID is required')
+      setLoading(false)
+      return
+    }
+    
     try {
       const { error: configError } = await updateInEdgeFunction('config', {
-        bundle_id: bundleId,
-        apple_issuer_id: issuerId,
-        apple_key_id: keyId,
+        bundle_id: bundleId.trim(),
+        apple_issuer_id: issuerId.trim(),
+        apple_key_id: keyId.trim(),
         updated_at: new Date().toISOString()
       })
 
@@ -133,6 +152,7 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
       setSteps(newSteps)
       
       // Move to next step
+      setError('')
       setCurrentStep(1)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save configuration')
@@ -239,10 +259,18 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
     setError('')
 
     try {
-      const { data, error } = await updateInEdgeFunction('config', {
+      // Include all required fields when updating
+      const updateData: any = {
         refund_preference: refundPreference,
         updated_at: new Date().toISOString()
-      })
+      }
+      
+      // Include required fields if they are set
+      if (bundleId) updateData.bundle_id = bundleId.trim()
+      if (issuerId) updateData.apple_issuer_id = issuerId.trim()
+      if (keyId) updateData.apple_key_id = keyId.trim()
+      
+      const { data, error } = await updateInEdgeFunction('config', updateData)
       
       if (error) {
         throw new Error(error.message || 'Failed to update refund preference')
@@ -285,6 +313,11 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
       case 0: // Apple Configuration
         return (
           <div className="space-y-4">
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                {error}
+              </div>
+            )}
             <div>
               <label htmlFor="bundleId" className="block text-sm font-medium text-gray-700">
                 Bundle ID
@@ -386,7 +419,10 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
 
             <div className="flex space-x-3">
               <button
-                onClick={() => setCurrentStep(0)}
+                onClick={() => {
+                  setError('')
+                  setCurrentStep(0)
+                }}
                 className="flex-1 py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
                 <ArrowLeftIcon className="h-4 w-4 inline mr-1" />
@@ -466,7 +502,10 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
 
             <div className="flex space-x-3">
               <button
-                onClick={() => setCurrentStep(1)}
+                onClick={() => {
+                  setError('')
+                  setCurrentStep(1)
+                }}
                 className="flex-1 py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
                 <ArrowLeftIcon className="h-4 w-4 inline mr-1" />
@@ -694,7 +733,10 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
 
             <div className="flex space-x-3">
               <button
-                onClick={() => setCurrentStep(2)}
+                onClick={() => {
+                  setError('')
+                  setCurrentStep(2)
+                }}
                 className="flex-1 py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
                 <ArrowLeftIcon className="h-4 w-4 inline mr-1" />
@@ -708,7 +750,10 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
                 {testLoading ? 'Sending...' : 'Send Test'}
               </button>
               <button
-                onClick={() => setCurrentStep(4)}
+                onClick={() => {
+                  setError('')
+                  setCurrentStep(4)
+                }}
                 disabled={testResult?.firstSendAttemptResult !== 'SUCCESS'}
                 className="flex-1 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
               >
@@ -759,7 +804,10 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
 
             <div className="flex space-x-3">
               <button
-                onClick={() => setCurrentStep(3)}
+                onClick={() => {
+                  setError('')
+                  setCurrentStep(3)
+                }}
                 className="flex-1 py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
                 <ArrowLeftIcon className="h-4 w-4 inline mr-1" />
@@ -852,7 +900,10 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
 
             <div className="flex space-x-3">
               <button
-                onClick={() => setCurrentStep(4)}
+                onClick={() => {
+                  setError('')
+                  setCurrentStep(4)
+                }}
                 className="flex-1 py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
                 <ArrowLeftIcon className="h-4 w-4 inline mr-1" />
