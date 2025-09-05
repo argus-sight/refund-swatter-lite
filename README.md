@@ -12,7 +12,7 @@ Watch the [complete setup and usage tutorial](https://www.youtube.com/watch?v=j-
 
 ## Overview
 
-Refund Swatter Lite processes Apple's CONSUMPTION_REQUEST notifications and sends consumption information back to Apple within the required 12-hour window, helping reduce fraudulent refunds.
+Refund Swatter Lite significantly reduces malicious refund risks by processing Apple's CONSUMPTION_REQUEST notifications and sending detailed consumption data back to Apple within the required 12-hour window, enabling Apple to make informed decisions on refund requests.
 
 ### Key Features
 
