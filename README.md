@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <b>Stop fraudulent App Store refunds in 12 hours — 100% on Supabase.</b>
+  <b>Stop fraudulent App Store refunds in real-time — 100% on Supabase.</b>
   <br/>
   <sub>Single-tenant, secure, and easy to set up for one app.</sub>
   <br/>
@@ -38,14 +38,14 @@ Simplified single-tenant Apple App Store refund prevention service using Supabas
 
 ## Overview
 
-Refund Swatter Lite significantly reduces malicious refund risks by processing Apple's CONSUMPTION_REQUEST notifications and sending detailed consumption data back to Apple within the required 12-hour window, enabling Apple to make informed decisions on refund requests.
+Refund Swatter Lite significantly reduces malicious refund risks by processing Apple's CONSUMPTION_REQUEST notifications in real-time and sending detailed consumption data back to Apple, enabling Apple to make informed decisions on refund requests.
 
 ### Key Features
 
 - **You Own Your Keys (BYOK, Bring Your Own Key)** - Keep your Apple private keys within your own Supabase project; no third‑party uploads required
-- **Single App Support** - Optimized for one app deployment
+- **Real-time Processing** - Instantly handles notifications as they arrive
 - **100% Supabase** - No additional servers required  
-- **Auto-processing** - Handles notifications automatically
+- **Auto-processing** - Fully automated workflow
 - **12 Consumption Fields** - Calculates all required Apple fields
 - **Secure Vault Storage** - Private keys encrypted in Supabase Vault
 - **Simple Setup** - One configuration file, one setup script
@@ -53,7 +53,7 @@ Refund Swatter Lite significantly reduces malicious refund risks by processing A
 ## Why Refund Swatter Lite?
 
 - Real pain: many iOS teams have suffered sudden large-scale refund abuse overnight — hundreds to tens of thousands of dollars, sometimes even leading to app takedowns.
-- How it works: after a user requests a refund, Apple sends up to three CONSUMPTION_REQUEST notifications. If developers respond correctly within the 12-hour window (e.g., cumulative spend, cumulative refunds, developer refund preference), Apple can make a fairer decision and abuse drops significantly.
+- How it works: after a user requests a refund, Apple sends up to three CONSUMPTION_REQUEST notifications. If developers respond with consumption data in real-time (e.g., cumulative spend, cumulative refunds, developer refund preference), Apple can make a fairer decision and abuse drops significantly.
 - Timeline: refund eligibility can extend up to 90 days from purchase; your backend must remain ready throughout that period.
 - Gap in existing tools: some platforms (e.g., RevenueCat) automate replies but require uploading the App Store Server API private key (AuthKey.p8) and In‑App Purchase Key to their cloud, effectively delegating App Store Connect query/operation rights to a third party — unacceptable for security‑sensitive teams.
 - Our approach: runs 100% on Supabase with one‑command setup and zero server maintenance; BYOK (Bring Your Own Key) — your Apple private keys stay only in your Supabase project (Vault/env), never uploaded to any third party.
@@ -166,4 +166,4 @@ For issues or questions, please open an issue on GitHub.
 
 - Multi-tenant SaaS: zero-deploy service
 - Refund Swatter Pro: risk control system for professional fraud rings
-- Ideas or interest: contact me at rockrong89@gmail.com
+- Have ideas or interested in collaboration? Please open an issue on GitHub - we'd love to hear from you!
