@@ -161,3 +161,9 @@ Licensed under the Apache License 2.0. See [LICENSE](./LICENSE) for details.
 ## Support
 
 For issues or questions, please open an issue on GitHub.
+
+## Future Plans
+
+- Multi-tenant SaaS: zero-deploy service
+- Refund Swatter Pro: risk control system for professional fraud rings
+- Ideas or interest: contact me at rockrong89@gmail.com

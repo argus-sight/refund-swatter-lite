@@ -160,3 +160,9 @@ refund-swatter-lite/
 ## 支持
 
 如有问题或疑问，请在 GitHub 上提交 issue。
+
+## 未来计划
+
+- 开发多租户的 SaaS 服务：免部署
+- 开发 Refund Swatter Pro 版本：面向专业黑灰产团伙的风控系统
+- 有其它想法/兴趣，欢迎联系我：rockrong89@gmail.com
