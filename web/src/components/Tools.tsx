@@ -6,11 +6,13 @@ import NotificationHistory from './tools/NotificationHistory'
 import RefundHistory from './tools/RefundHistory'
 import ManualReprocess from './tools/ManualReprocess'
 import TransactionHistory from './tools/TransactionHistory'
+import DataInitialization from './DataInitialization'
 import {
   ClockIcon,
   ArrowPathIcon,
   ArrowUturnLeftIcon,
-  CreditCardIcon
+  CreditCardIcon,
+  CircleStackIcon
 } from '@heroicons/react/24/outline'
 
 interface ToolsProps {
@@ -44,6 +46,12 @@ export default function Tools({ environment }: ToolsProps) {
       name: 'Transaction History', 
       icon: CreditCardIcon,
       description: 'View all transaction records'
+    },
+    { 
+      id: 'data-initialization', 
+      name: 'Data Initialization', 
+      icon: CircleStackIcon,
+      description: 'Import historical data from Apple'
     }
   ]
 
@@ -57,6 +65,11 @@ export default function Tools({ environment }: ToolsProps) {
         return <ManualReprocess environment={environment} />
       case 'transaction-history':
         return <TransactionHistory environment={environment} />
+      case 'data-initialization':
+        return <DataInitialization environment={environment} onComplete={() => {
+          // Optionally refresh the page or show a success message
+          console.log('Data initialization completed')
+        }} />
       default:
         return null
     }

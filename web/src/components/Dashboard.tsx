@@ -7,6 +7,7 @@ import ConsumptionMetrics from './ConsumptionMetrics'
 import GuidedSetup from './GuidedSetup'
 import Tools from './Tools'
 import ConsumptionRequestHistory from './tools/ConsumptionRequestHistory'
+import MaskedValue from './MaskedValue'
 import { getFromEdgeFunction } from '@/lib/edge-functions'
 import { supabase } from '@/lib/supabase'
 import { 
@@ -162,22 +163,25 @@ export default function Dashboard() {
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-lg font-semibold mb-4">Configuration Status</h2>
               <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Bundle ID:</span>
-                  <span className="text-sm font-mono">{config?.bundle_id}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Issuer ID:</span>
-                  <span className="text-sm font-mono">{config?.apple_issuer_id}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Key ID:</span>
-                  <span className="text-sm font-mono">{config?.apple_key_id}</span>
-                </div>
+                <MaskedValue 
+                  label="Bundle ID" 
+                  value={config?.bundle_id}
+                  maskByDefault={false}
+                />
+                <MaskedValue 
+                  label="Issuer ID" 
+                  value={config?.apple_issuer_id}
+                  maskByDefault={true}
+                />
+                <MaskedValue 
+                  label="Key ID" 
+                  value={config?.apple_key_id}
+                  maskByDefault={true}
+                />
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-600">In-App Purchase Key:</span>
-                  <span className="text-sm text-green-600">
-                    {config?.apple_private_key ? 'Configured' : 'Not configured'}
+                  <span className={`text-sm ${config?.apple_private_key_id ? 'text-green-600' : 'text-amber-600'}`}>
+                    {config?.apple_private_key_id ? 'Configured' : 'Not configured'}
                   </span>
                 </div>
               </div>
