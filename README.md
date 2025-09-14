@@ -9,7 +9,7 @@
   <br/>
   <sub>Single-tenant, secure, and easy to set up for one app.</sub>
   <br/>
-  <sub>You own your keys — Apple private keys are never uploaded to any third party.</sub>
+  <sub>You own your keys — In-App Purchase Keys are never uploaded to any third party.</sub>
 </p>
 
 <p align="center">
@@ -42,7 +42,7 @@ Refund Swatter Lite significantly reduces malicious refund risks by processing A
 
 ### Key Features
 
-- **You Own Your Keys (BYOK, Bring Your Own Key)** - Keep your Apple private keys within your own Supabase project; no third‑party uploads required
+- **You Own Your Keys (BYOK, Bring Your Own Key)** - Keep your In-App Purchase Keys within your own Supabase project; no third‑party uploads required
 - **Real-time Processing** - Instantly handles notifications as they arrive
 - **100% Supabase** - No additional servers required  
 - **Auto-processing** - Fully automated workflow
@@ -55,8 +55,8 @@ Refund Swatter Lite significantly reduces malicious refund risks by processing A
 - Real pain: many iOS teams have suffered sudden large-scale refund abuse overnight — hundreds to tens of thousands of dollars, sometimes even leading to app takedowns.
 - How it works: after a user requests a refund, Apple sends up to three CONSUMPTION_REQUEST notifications. If developers respond with consumption data in real-time (e.g., cumulative spend, cumulative refunds, developer refund preference), Apple can make a fairer decision and abuse drops significantly.
 - Timeline: refund eligibility can extend up to 90 days from purchase; your backend must remain ready throughout that period.
-- Gap in existing tools: some platforms (e.g., RevenueCat) automate replies but require uploading the App Store Server API private key (AuthKey.p8) and In‑App Purchase Key to their cloud, effectively delegating App Store Connect query/operation rights to a third party — unacceptable for security‑sensitive teams.
-- Our approach: runs 100% on Supabase with one‑command setup and zero server maintenance; BYOK (Bring Your Own Key) — your Apple private keys stay only in your Supabase project (Vault/env), never uploaded to any third party.
+- Gap in existing tools: some platforms (e.g., RevenueCat) automate replies but require uploading the App Store Server API key (AuthKey.p8) and In-App Purchase Key to their cloud, effectively delegating App Store Connect query/operation rights to a third party — unacceptable for security‑sensitive teams.
+- Our approach: runs 100% on Supabase with one‑command setup and zero server maintenance; BYOK (Bring Your Own Key) — your In-App Purchase Keys stay only in your Supabase project (Vault/env), never uploaded to any third party.
 - Observability: auto‑responds to CONSUMPTION_REQUEST while surfacing field meanings, jobs, and logs for easy debugging and audits.
 - Impact: keeps AuthKey/IAP Key safe and meaningfully reduces fraudulent refunds (especially for consumables).
 
@@ -131,18 +131,29 @@ This will automatically:
 3. **Configure Apple credentials**
 
 Access the web dashboard at `http://localhost:3000` and add:
-- **Bundle ID**: Your app's bundle identifier (e.g., `com.example.myapp`)
-- **Issuer ID**: From App Store Connect → Users and Access → Integrations → App Store Connect API
-  - Look at the "Issuer ID" field at the top (e.g., `12345678-1234-1234-1234-123456789abc`)
-- **Key ID**: From App Store Connect → Users and Access → Integrations → App Store Connect API
-  - Find your key in the "Active" section → Copy the KEY ID column value (e.g., `G4NMRJT7S4`)
-- **Private Key (App Store Connect API Key)**: Upload your .p8 file downloaded from App Store Connect
-  - Navigate to: App Store Connect → Users and Access → Integrations → App Store Connect API
-  - Click "Generate API Key" or "+" button to create a new key
-  - Select "Admin" access
-  - Download the .p8 file (IMPORTANT: you can only download once! Save it securely)
-  - In the dashboard, click "Choose File" or "Upload" button to upload the .p8 file directly
-  - File name example: `AuthKey_G4NMRJT7S4.p8`
+
+**Step 1 - Bundle ID**:
+- Go to App Store Connect → Apps → Select your app
+- Navigate to "App Information" (under General section)
+- Copy the "Bundle ID" value (e.g., `com.yourcompany.app`)
+
+**Step 2 - Issuer ID**:
+- Go to App Store Connect → Users and Access → Integrations tab
+- In the "In-App Purchase" section, find the "Issuer ID" field
+- Copy this value (e.g., `12345678-1234-1234-1234-123456789abc`)
+
+**Step 3 - Key ID**:
+- Stay in Users and Access → Integrations → In-App Purchase section
+- Look at the "Active" keys table below
+- Find your key and copy the "KEY ID" column value (e.g., `ABCD12EF34`)
+
+**Step 4 - In-App Purchase Key (.p8 file)**:
+- If you don't have a key yet:
+  - In the same In-App Purchase section, click "Generate In-App Purchase Key" or "+" button
+  - Enter a name for your key
+  - Click "Generate"
+  - **IMPORTANT**: Download the .p8 file immediately (you can only download it once!)
+- Upload the .p8 file in the dashboard
 
 4. **Set webhook in App Store Connect**
 - Go to App Store Connect → My Apps → Your App → App Store Server Notifications
@@ -231,7 +242,7 @@ refund-swatter-lite/
 - Authentication verification for all Edge Functions
 - Service role keys never exposed to client
 - CRON_SECRET protects scheduled endpoints
-- No third‑party key upload — Apple private keys remain in your Supabase project only
+- No third‑party key upload — In-App Purchase Keys remain in your Supabase project only
 
 ## License
 

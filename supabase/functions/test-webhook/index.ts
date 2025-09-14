@@ -166,7 +166,7 @@ serve(async (req) => {
       console.log('JWT used:', jwt.substring(0, 50) + '...')
       return new Response(
         JSON.stringify({ 
-          error: 'Apple API authentication failed. Please check your Apple credentials (Issuer ID, Key ID, and Private Key).',
+          error: 'Apple API authentication failed. Please check your Apple credentials (Issuer ID, Key ID, and In-App Purchase Key).',
           errorCode: 'AUTH_FAILED',
           details: {
             status: 401,

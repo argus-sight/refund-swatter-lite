@@ -152,7 +152,7 @@ vercel --prod
    - Open web dashboard
    - Go to Settings
    - Enter Bundle ID, Issuer ID, Key ID
-   - Paste private key content
+   - Paste In-App Purchase Key content
 
 ## Testing
 

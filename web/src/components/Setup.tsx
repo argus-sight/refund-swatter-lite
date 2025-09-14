@@ -112,7 +112,7 @@ export default function Setup({ onSetupComplete }: SetupProps) {
 
             <div>
               <label htmlFor="privateKeyFile" className="block text-sm font-medium text-gray-700">
-                Private Key (.p8 file)
+                In-App Purchase Key (.p8 file)
               </label>
               <div className="mt-1">
                 <input

@@ -189,7 +189,7 @@ $$;
 ALTER FUNCTION "public"."decode_jwt_payload"("jwt_token" "text") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."get_apple_private_key"() RETURNS "text"
+CREATE OR REPLACE FUNCTION "public"."get_apple_private_key"() RETURNS "text" -- Gets In-App Purchase Key from vault
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public', 'vault'
     AS $$
@@ -200,7 +200,7 @@ BEGIN
     SELECT apple_private_key_id INTO v_secret_id FROM config WHERE id = 1;
     
     IF v_secret_id IS NULL THEN
-        RAISE EXCEPTION 'Apple private key not configured';
+        RAISE EXCEPTION 'In-App Purchase Key not configured';
     END IF;
     
     SELECT decrypted_secret INTO v_private_key 
@@ -208,7 +208,7 @@ BEGIN
     WHERE id = v_secret_id;
     
     IF v_private_key IS NULL THEN
-        RAISE EXCEPTION 'Apple private key not found in vault';
+        RAISE EXCEPTION 'In-App Purchase Key not found in vault';
     END IF;
     
     RETURN v_private_key;
@@ -434,7 +434,7 @@ COMMENT ON FUNCTION "public"."process_pending_notifications_direct"() IS 'Backup
 
 
 
-CREATE OR REPLACE FUNCTION "public"."store_apple_private_key"("p_private_key" "text") RETURNS "uuid"
+CREATE OR REPLACE FUNCTION "public"."store_apple_private_key"("p_private_key" "text") RETURNS "uuid" -- Stores In-App Purchase Key in vault
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public', 'vault'
     AS $$

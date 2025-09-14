@@ -141,7 +141,7 @@ FUNCTIONS=(
     "test-webhook"  # Testing webhook functionality
     "test-webhook-status"  # Webhook test status
     "process-pending"  # Process pending notifications
-    "store-apple-key"  # Store Apple private key
+    "store-apple-key"  # Store In-App Purchase Key
     "consumption-metrics"  # Consumption metrics API
     "consumption-requests"  # Consumption requests history
     "apple-transaction-history"  # Apple transaction history

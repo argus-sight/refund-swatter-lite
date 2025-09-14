@@ -9,7 +9,7 @@
   <br/>
   <sub>面向单应用、简单安全、开箱即用。</sub>
   <br/>
-  <sub>密钥自持（BYOK）：你的 Apple 私钥不会上传到任何第三方平台。</sub>
+  <sub>密钥自持（BYOK）：你的 In-App Purchase Key 不会上传到任何第三方平台。</sub>
 </p>
 
 <p align="center">
@@ -42,7 +42,7 @@ Refund Swatter Lite 实时处理 Apple 的 CONSUMPTION_REQUEST 通知，并立�
 
 ### 主要特性
 
-- **密钥自持（BYOK）** - Apple 私钥仅保存在你的 Supabase 项目内，无需上传到任何第三方平台
+- **密钥自持（BYOK）** - In-App Purchase Key 仅保存在你的 Supabase 项目内，无需上传到任何第三方平台
 - **实时处理** - 立即处理收到的通知
 - **100% Supabase** - 无需额外服务器
 - **自动处理** - 全自动化工作流程
@@ -54,8 +54,8 @@ Refund Swatter Lite 实时处理 Apple 的 CONSUMPTION_REQUEST 通知，并立�
 
 - 痛点真实存在：不少 iOS 团队遭遇过"隔夜大规模恶意退款"，轻则几百刀、重则上万刀，还可能被下架。
 - 关键机制：用户申请退款后，Apple 会向开发者发送最多 3 次 CONSUMPTION_REQUEST；只要实时回复包含消费信息（累计消费/累计退款/开发者偏好等），即可帮助 Apple 更"公平"地决策，从而显著降低恶意退款比例。退款周期最长可达 90 天，因此需要持续覆盖这一周期。
-- 现有方案不足：如 RevenueCat 等三方平台虽支持自动回复，但通常需要把 App Store Server API 私钥（AuthKey.p8）与 In‑App Purchase Key 上传到其云端，把查询与操作权限交给第三方；对安全敏感团队（含企业）而言难以接受。
-- 我们的取舍：本项目 100% 基于 Supabase，一键部署、零服务器维护；密钥自持（BYOK），Apple 私钥仅保存在你的 Supabase 项目（Vault/环境变量）内，绝不上传第三方。
+- 现有方案不足：如 RevenueCat 等三方平台虽支持自动回复，但通常需要把 App Store Server API 密钥（AuthKey.p8）与 In-App Purchase Key 上传到其云端，把查询与操作权限交给第三方；对安全敏感团队（含企业）而言难以接受。
+- 我们的取舍：本项目 100% 基于 Supabase，一键部署、零服务器维护；密钥自持（BYOK），In-App Purchase Key 仅保存在你的 Supabase 项目（Vault/环境变量）内，绝不上传第三方。
 - 可观测与可审计：自动答复 CONSUMPTION_REQUEST 的同时，展示各字段含义、任务与日志，方便排查与回溯。
 - 实际收益：在保证 AuthKey 与 IAP Key 安全性的同时，显著减少恶意退款订单（对消耗型尤其明显）。
 
@@ -99,7 +99,7 @@ cp .env.project.example .env.project
 - Bundle ID
 - Issuer ID（来自 App Store Connect）
 - Key ID（来自 App Store Connect）
-- 私钥（.p8 文件内容）
+- In-App Purchase Key（.p8 文件内容）
 
 4. **在 App Store Connect 中设置 webhook**
 - Production URL：`https://your-project.supabase.co/functions/v1/webhook`
@@ -151,7 +151,7 @@ refund-swatter-lite/
 - 所有 Edge Functions 的身份验证验证
 - 服务角色密钥永不暴露给客户端
 - CRON_SECRET 保护计划端点
-- 不上传密钥到第三方（BYOK） — Apple 私钥仅保存在你的 Supabase 项目中
+- 不上传密钥到第三方（BYOK） — In-App Purchase Key 仅保存在你的 Supabase 项目中
 
 ## 许可证
 

@@ -175,7 +175,7 @@ export default function Dashboard() {
                   <span className="text-sm font-mono">{config?.apple_key_id}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Private Key:</span>
+                  <span className="text-sm text-gray-600">In-App Purchase Key:</span>
                   <span className="text-sm text-green-600">
                     {config?.apple_private_key ? 'Configured' : 'Not configured'}
                   </span>

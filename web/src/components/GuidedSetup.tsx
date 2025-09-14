@@ -31,7 +31,7 @@ const STEPS: StepProps[] = [
   },
   {
     title: 'Upload P8 Key',
-    description: 'Upload your Apple private key file',
+    description: 'Upload your In-App Purchase Key file',
     completed: false
   },
   {
@@ -90,10 +90,6 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
   
   useEffect(() => {
     loadConfig()
-    // Set webhook URL on client side if not already set
-    if (!webhookUrl && process.env.NEXT_PUBLIC_SUPABASE_URL) {
-      setWebhookUrl(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/webhook`)
-    }
   }, [])
 
   const loadConfig = async () => {
@@ -103,12 +99,12 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
         console.error('Failed to load config:', error)
       } else if (data) {
         setConfig(data)
-        // Pre-fill fields if config exists
+        // Pre-fill fields if config exists, ensuring no undefined values
         setBundleId(data.bundle_id || '')
         setIssuerId(data.apple_issuer_id || '')
         setKeyId(data.apple_key_id || '')
         if (data.apple_private_key) setPrivateKeyUploaded(true)
-        setRefundPreference(data.refund_preference ?? 0)
+        setRefundPreference(data.refund_preference !== null && data.refund_preference !== undefined ? data.refund_preference : 0)
       }
     } catch (error) {
       console.error('Error loading config:', error)
@@ -334,7 +330,16 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
                 placeholder="com.example.app"
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
               />
-              <p className="mt-1 text-xs text-gray-500">Your app's bundle identifier</p>
+              <div className="mt-2 bg-blue-50 p-3 rounded-md">
+                <p className="text-xs text-blue-800 font-medium">How to get Bundle ID:</p>
+                <ol className="mt-1 text-xs text-blue-700 space-y-1">
+                  <li>1. Go to App Store Connect → Apps</li>
+                  <li>2. Select your app</li>
+                  <li>3. Go to App Information (under General)</li>
+                  <li>4. Find "Bundle ID" field</li>
+                </ol>
+                <p className="mt-2 text-xs text-blue-600">Example: com.yourcompany.app</p>
+              </div>
             </div>
 
             <div>
@@ -349,7 +354,16 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
                 placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
               />
-              <p className="mt-1 text-xs text-gray-500">Found in App Store Connect → Users and Access → Keys</p>
+              <div className="mt-2 bg-blue-50 p-3 rounded-md">
+                <p className="text-xs text-blue-800 font-medium">How to get Issuer ID:</p>
+                <ol className="mt-1 text-xs text-blue-700 space-y-1">
+                  <li>1. Go to App Store Connect</li>
+                  <li>2. Click "Users and Access" in the top menu</li>
+                  <li>3. Select "Integrations" tab</li>
+                  <li>4. Under "In-App Purchase" section, find "Issuer ID" field (red box in the image)</li>
+                </ol>
+                <p className="mt-2 text-xs text-blue-600">Example: 12345678-1234-1234-1234-123456789abc</p>
+              </div>
             </div>
 
             <div>
@@ -364,7 +378,16 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
                 placeholder="XXXXXXXXXX"
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
               />
-              <p className="mt-1 text-xs text-gray-500">Your private key ID from App Store Connect</p>
+              <div className="mt-2 bg-blue-50 p-3 rounded-md">
+                <p className="text-xs text-blue-800 font-medium">How to get Key ID:</p>
+                <ol className="mt-1 text-xs text-blue-700 space-y-1">
+                  <li>1. Go to App Store Connect → Users and Access → Integrations</li>
+                  <li>2. In "In-App Purchase" section, look at the "Active" keys table</li>
+                  <li>3. Find your key in the list</li>
+                  <li>4. Copy the value from "KEY ID" column (red box in the image)</li>
+                </ol>
+                <p className="mt-2 text-xs text-blue-600">Example: ABCD12EF34</p>
+              </div>
             </div>
 
             <button
@@ -381,16 +404,27 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
         return (
           <div className="space-y-4">
             <div className="bg-blue-50 p-4 rounded-lg">
-              <h3 className="text-sm font-medium text-blue-900">About the Private Key</h3>
+              <h3 className="text-sm font-medium text-blue-900">About the In-App Purchase Key</h3>
               <p className="mt-1 text-sm text-blue-700">
-                The P8 private key is used to authenticate API requests to Apple's servers.
-                You can download this key from App Store Connect when creating an API key.
+                The P8 In-App Purchase Key is used to authenticate API requests to Apple's servers.
               </p>
+              <div className="mt-3">
+                <p className="text-xs text-blue-800 font-medium">How to create and download the P8 key:</p>
+                <ol className="mt-1 text-xs text-blue-700 space-y-1">
+                  <li>1. Go to App Store Connect → Users and Access → Integrations</li>
+                  <li>2. In the "In-App Purchase" section, click "Generate In-App Purchase Key" or "+" button</li>
+                  <li>3. Enter a name for your key (e.g., "in_app_purchase_key")</li>
+                  <li>4. Click "Generate"</li>
+                  <li>5. Download the .p8 file immediately (you can only download it once!)</li>
+                  <li>6. Save the file securely - you'll need to upload it below</li>
+                </ol>
+                <p className="mt-2 text-xs text-amber-600 font-medium">⚠️ Important: You can only download the key once. Save it securely!</p>
+              </div>
             </div>
 
             <div>
               <label htmlFor="privateKeyFile" className="block text-sm font-medium text-gray-700">
-                Private Key (.p8 file)
+                In-App Purchase Key (.p8 file)
               </label>
               <div className="mt-1">
                 <input
