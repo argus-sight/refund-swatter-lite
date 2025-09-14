@@ -100,9 +100,9 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
       } else if (data) {
         setConfig(data)
         // Pre-fill fields if config exists, ensuring no undefined values
-        setBundleId(data.bundle_id || '')
-        setIssuerId(data.apple_issuer_id || '')
-        setKeyId(data.apple_key_id || '')
+        setBundleId(data.bundle_id ?? '')
+        setIssuerId(data.apple_issuer_id ?? '')
+        setKeyId(data.apple_key_id ?? '')
         if (data.apple_private_key) setPrivateKeyUploaded(true)
         setRefundPreference(data.refund_preference !== null && data.refund_preference !== undefined ? data.refund_preference : 0)
       }
@@ -569,6 +569,20 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
               <p className="mt-1 text-sm text-blue-700">
                 Send a test notification to verify your setup is working correctly.
               </p>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg">
+              <div className="flex">
+                <svg className="h-5 w-5 text-amber-400 mr-2 flex-shrink-0 mt-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                </svg>
+                <div>
+                  <h4 className="text-sm font-medium text-amber-800">Important: Wait for Apple deployment</h4>
+                  <p className="mt-1 text-sm text-amber-700">
+                    After configuring your webhook URL, please wait approximately 10 minutes for Apple's servers to deploy and activate your webhook endpoint before running the test notification.
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div>

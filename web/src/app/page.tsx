@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Setup from '@/components/Setup'
+import Welcome from '@/components/Welcome'
 import Dashboard from '@/components/Dashboard'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { createBrowserClient } from '@supabase/ssr'
@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext'
 
 export default function Home() {
   const [isConfigured, setIsConfigured] = useState<boolean | null>(null)
+  const [showWelcome, setShowWelcome] = useState(true)
   const [configLoading, setConfigLoading] = useState(true)
   const { signOut, session, loading: authLoading } = useAuth()
 
@@ -64,6 +65,10 @@ export default function Home() {
           config?.apple_private_key_id
         )
         setIsConfigured(configured)
+        // If already configured, skip welcome page
+        if (configured) {
+          setShowWelcome(false)
+        }
       }
     } catch (error) {
       console.error('Error:', error)
@@ -73,29 +78,37 @@ export default function Home() {
     }
   }
 
+  const handleGetStarted = () => {
+    // Navigate to Dashboard, which will show the Setup tab
+    setShowWelcome(false)
+    setIsConfigured(true) // This will show Dashboard, and user can access Setup tab there
+  }
+
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gray-50">
-        <div className="bg-white shadow-sm border-b">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center py-4">
-              <h1 className="text-xl font-semibold">Refund Swatter Admin</h1>
-              <button
-                onClick={signOut}
-                className="text-sm text-gray-600 hover:text-gray-900"
-              >
-                Sign Out
-              </button>
+        {!showWelcome && (
+          <div className="bg-white shadow-sm border-b">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between items-center py-4">
+                <h1 className="text-xl font-semibold">Refund Swatter Admin</h1>
+                <button
+                  onClick={signOut}
+                  className="text-sm text-gray-600 hover:text-gray-900"
+                >
+                  Sign Out
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
         
         {configLoading ? (
           <div className="flex items-center justify-center mt-20">
             <div className="text-lg">Loading configuration...</div>
           </div>
-        ) : !isConfigured ? (
-          <Setup onSetupComplete={() => setIsConfigured(true)} />
+        ) : showWelcome && !isConfigured ? (
+          <Welcome onGetStarted={handleGetStarted} />
         ) : (
           <Dashboard />
         )}

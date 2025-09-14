@@ -24,6 +24,7 @@ export default function Dashboard() {
   const [config, setConfig] = useState<any>(null)
   const [stats, setStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [showSetupHint, setShowSetupHint] = useState(false)
 
   useEffect(() => {
     loadConfig()
@@ -42,6 +43,12 @@ export default function Dashboard() {
         console.error('Failed to load config:', error)
       } else if (data) {
         setConfig(data)
+        // Check if configuration is incomplete and redirect to setup tab
+        const isIncomplete = !data.apple_issuer_id || !data.apple_key_id || !data.apple_private_key_id
+        if (isIncomplete) {
+          setActiveTab('setup')
+          setShowSetupHint(true)
+        }
       }
     } catch (error) {
       console.error('Error loading config:', error)
@@ -105,6 +112,29 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-100">
+      {/* Setup Hint Banner */}
+      {showSetupHint && activeTab === 'setup' && (
+        <div className="bg-indigo-600">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between py-3">
+              <div className="flex items-center">
+                <span className="text-white text-sm font-medium">
+                  Welcome! Complete the setup process below to start protecting your app revenue.
+                </span>
+              </div>
+              <button
+                onClick={() => setShowSetupHint(false)}
+                className="text-white hover:text-gray-200"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Header */}
       <div className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -137,9 +167,14 @@ export default function Dashboard() {
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => {
+                  setActiveTab(tab.id)
+                  if (tab.id === 'setup' && showSetupHint) {
+                    setShowSetupHint(false)
+                  }
+                }}
                 className={`
-                  py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2
+                  py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 relative
                   ${activeTab === tab.id
                     ? 'border-indigo-500 text-indigo-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -148,6 +183,10 @@ export default function Dashboard() {
               >
                 <tab.icon className="h-5 w-5" />
                 <span>{tab.name}</span>
+                {/* Show a badge for Setup tab if configuration is incomplete */}
+                {tab.id === 'setup' && showSetupHint && activeTab !== 'setup' && (
+                  <span className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full animate-pulse"></span>
+                )}
               </button>
             ))}
           </nav>
