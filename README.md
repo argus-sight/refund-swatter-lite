@@ -81,6 +81,40 @@ cp .env.project.example .env.project
 # Edit .env.project with your credentials
 ```
 
+**Important .env.project configurations:**
+- **SUPABASE_DB_PASSWORD**: This is your database password that you set when creating your Supabase project
+  - If you forgot it: Go to Project Settings → Database → Reset Database Password
+  - Example: `your-strong-password-123!`
+  - Note: This is different from your Supabase account password
+- **SUPABASE_PROJECT_REF**: Your project reference ID (see below for how to obtain)
+
+**How to get your Supabase Project Reference:**
+- Option 1: From Supabase Dashboard
+  - Go to https://app.supabase.com/projects
+  - Click on your project
+  - Look at the URL: `https://app.supabase.com/project/[your-project-ref]`
+  - Example: If URL is `https://app.supabase.com/project/abcdefghijklmnop`, then your project ref is `abcdefghijklmnop`
+- Option 2: From Project Settings
+  - Go to Project Settings → General
+  - Find "Project ID" field
+  - Example: `abcdefghijklmnop`
+
+**How to get your Apple Bundle ID:**
+- Option 1: From Xcode
+  - Open your project in Xcode
+  - Select your project in navigator → Select target → General tab
+  - Find "Bundle Identifier" field
+  - Example: `com.yourcompany.yourapp`
+- Option 2: From App Store Connect
+  - Go to https://appstoreconnect.apple.com
+  - My Apps → Select your app → App Information
+  - Find "Bundle ID" field
+  - Example: `com.example.myapp`
+- Option 3: From Info.plist
+  - Open your app's Info.plist file
+  - Look for `CFBundleIdentifier` key
+  - Example: `<string>com.company.appname</string>`
+
 2. **Run setup script**
 ```bash
 ./setup-simple.sh
@@ -97,14 +131,26 @@ This will automatically:
 3. **Configure Apple credentials**
 
 Access the web dashboard at `http://localhost:3000` and add:
-- Bundle ID
-- Issuer ID (from App Store Connect)
-- Key ID (from App Store Connect)
-- Private Key (.p8 file content)
+- **Bundle ID**: Your app's bundle identifier (e.g., `com.example.myapp`)
+- **Issuer ID**: From App Store Connect → Users and Access → Keys → Find your key → Copy Issuer ID (e.g., `69a6de70-03db-47e3-9c6a-9c9e8b9a8b7a`)
+- **Key ID**: From App Store Connect → Users and Access → Keys → Your key name → Copy Key ID (e.g., `2X9R4HXF34`)
+- **Private Key**: Content of your .p8 file downloaded from App Store Connect
+  - Navigate to: App Store Connect → Users and Access → Keys → App Store Server API
+  - Click "+" to create a new key or use existing
+  - Download the .p8 file (you can only download once!)
+  - Open the .p8 file with a text editor and copy entire content including:
+    ```
+    -----BEGIN PRIVATE KEY-----
+    MIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQg...
+    -----END PRIVATE KEY-----
+    ```
 
 4. **Set webhook in App Store Connect**
-- Production URL: `https://your-project.supabase.co/functions/v1/webhook`
-- Sandbox URL: `https://your-project.supabase.co/functions/v1/webhook`
+- Go to App Store Connect → My Apps → Your App → App Store Server Notifications
+- Click "Edit" for both Production and Sandbox
+- **Production Server URL**: `https://[your-project-ref].supabase.co/functions/v1/webhook`
+  - Example: `https://abcdefghijklmnop.supabase.co/functions/v1/webhook`
+- **Sandbox Server URL**: Same as production URL
 
 ## Project Structure
 
