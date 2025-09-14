@@ -161,10 +161,12 @@ serve(async (req) => {
 })
 
 async function processNotification(supabase: any, notification: any) {
-  const { notification_type, subtype, decoded_payload, environment } = notification
+  const { notification_type, subtype, decoded_payload, decoded_transaction_info, environment } = notification
   
   // Extract common transaction info if available
-  const transactionInfo = decoded_payload?.data?.signedTransactionInfo
+  // For notifications stored by webhook, the signedTransactionInfo is already decoded
+  // For older notifications, use decoded_transaction_info field
+  const transactionInfo = decoded_payload?.data?.signedTransactionInfo || decoded_transaction_info
 
   switch (notification_type) {
     // ===== Core Types (Priority 1) =====

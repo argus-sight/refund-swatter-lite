@@ -43,6 +43,21 @@ async function getAppleJWT(supabase: any, requestId: string): Promise<string> {
   }
 }
 
+// Helper function to decode JWT without verification
+function decodeJWT(jwt: string): any {
+  try {
+    const parts = jwt.split('.')
+    if (parts.length !== 3) {
+      return null
+    }
+    // Decode the payload (middle part)
+    return JSON.parse(atob(parts[1]))
+  } catch (error) {
+    console.error('Failed to decode JWT:', error)
+    return null
+  }
+}
+
 async function storeNotifications(
   notifications: any[],
   supabase: any,
@@ -59,28 +74,57 @@ async function storeNotifications(
     const batch = notifications.slice(i, i + DB_BATCH_SIZE)
     
     // Prepare notifications for insertion into notifications_raw table
-    const notificationsToInsert = batch.map((notification: any) => ({
-      notification_uuid: notification.notificationUUID,
-      notification_type: notification.notificationType,
-      subtype: notification.subtype,
-      signed_payload: notification.signedPayload || '', // Store the original signed payload
-      decoded_payload: {
-        version: notification.version,
-        signedDate: notification.signedDate,
-        data: notification.data,
-        summary: notification.summary,
-        externalPurchaseToken: notification.externalPurchaseToken,
-        appAppleId: notification.appAppleId,
-        bundleId: notification.bundleId,
-        bundleVersion: notification.bundleVersion,
-        status: notification.status
-      },
-      environment: notification.data?.environment || normalizeEnvironment(environment),
-      status: NotificationStatus.PENDING, // Will be processed later
-      received_at: new Date().toISOString(),
-      source: NotificationSource.HISTORY_API, // Mark as coming from history API
-      signed_date: notification.signedDate ? new Date(notification.signedDate) : null
-    }))
+    const notificationsToInsert = batch.map((notification: any) => {
+      // Decode signedTransactionInfo if present
+      let decodedTransactionInfo = null
+      let modifiedData = notification.data
+      
+      if (notification.data?.signedTransactionInfo) {
+        decodedTransactionInfo = decodeJWT(notification.data.signedTransactionInfo)
+        if (decodedTransactionInfo) {
+          // Replace the JWT string with the decoded object in the data
+          modifiedData = {
+            ...notification.data,
+            signedTransactionInfo: decodedTransactionInfo
+          }
+        }
+      }
+      
+      // Also decode signedRenewalInfo if present
+      if (notification.data?.signedRenewalInfo) {
+        const decodedRenewalInfo = decodeJWT(notification.data.signedRenewalInfo)
+        if (decodedRenewalInfo) {
+          modifiedData = {
+            ...modifiedData,
+            signedRenewalInfo: decodedRenewalInfo
+          }
+        }
+      }
+      
+      return {
+        notification_uuid: notification.notificationUUID,
+        notification_type: notification.notificationType,
+        subtype: notification.subtype,
+        signed_payload: notification.signedPayload || '', // Store the original signed payload
+        decoded_payload: {
+          version: notification.version,
+          signedDate: notification.signedDate,
+          data: modifiedData, // Use modified data with decoded JWTs
+          summary: notification.summary,
+          externalPurchaseToken: notification.externalPurchaseToken,
+          appAppleId: notification.appAppleId,
+          bundleId: notification.bundleId,
+          bundleVersion: notification.bundleVersion,
+          status: notification.status
+        },
+        decoded_transaction_info: decodedTransactionInfo, // Store separately for easy access
+        environment: notification.data?.environment || normalizeEnvironment(environment),
+        status: NotificationStatus.PENDING, // Will be processed later
+        received_at: new Date().toISOString(),
+        source: NotificationSource.HISTORY_API, // Mark as coming from history API
+        signed_date: notification.signedDate ? new Date(notification.signedDate) : null
+      }
+    })
 
     // Insert with upsert to handle duplicates
     const { data, error } = await supabase
