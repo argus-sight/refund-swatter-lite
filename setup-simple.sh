@@ -137,6 +137,15 @@ FUNCTIONS=(
     "process-notifications"
     "process-notifications-cron"
     "reprocess-notification"
+    "config"  # Configuration management
+    "test-webhook"  # Testing webhook functionality
+    "test-webhook-status"  # Webhook test status
+    "process-pending"  # Process pending notifications
+    "store-apple-key"  # Store Apple private key
+    "consumption-metrics"  # Consumption metrics API
+    "consumption-requests"  # Consumption requests history
+    "apple-transaction-history"  # Apple transaction history
+    "apple-refund-history"  # Apple refund history
 )
 
 FAILED_FUNCTIONS=()
