@@ -126,25 +126,20 @@ export default function NotificationHistory({ environment }: NotificationHistory
     }
   }
 
+  // Check if Sandbox environment (max 30 days)
+  const isSandbox = environment === AppleEnvironment.SANDBOX
+  const maxDays = isSandbox ? 30 : 180
+
   return (
     <div className="bg-white rounded-lg shadow p-6">
       <h2 className="text-lg font-semibold mb-4">Apple Notification History</h2>
       <p className="text-sm text-gray-600 mb-4">
-        Query notification history directly from Apple (Default: Last 30 days, Maximum: 180 days)
+        Query notification history directly from Apple (Default: Last 30 days, Maximum: {maxDays} days)
       </p>
 
       <div className="space-y-4">
         {/* Quick date range presets */}
         <div className="flex gap-2">
-          <button
-            onClick={() => {
-              const range = getDefaultDateRange()
-              setParams(prev => ({ ...prev, ...range }))
-            }}
-            className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-          >
-            Last 30 Days
-          </button>
           <button
             onClick={() => {
               const endDate = new Date()
@@ -162,34 +157,47 @@ export default function NotificationHistory({ environment }: NotificationHistory
           </button>
           <button
             onClick={() => {
-              const endDate = new Date()
-              endDate.setUTCHours(23, 59, 59, 999)
-              const startDate = new Date(endDate.getTime() - (90 * 24 * 60 * 60 * 1000 - 1))
-              setParams(prev => ({
-                ...prev,
-                startDate: startDate.toISOString().split('T')[0],
-                endDate: endDate.toISOString().split('T')[0]
-              }))
+              const range = getDefaultDateRange()
+              setParams(prev => ({ ...prev, ...range }))
             }}
             className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
           >
-            Last 90 Days
+            Last 30 Days
           </button>
-          <button
-            onClick={() => {
-              const endDate = new Date()
-              endDate.setUTCHours(23, 59, 59, 999)
-              const startDate = new Date(endDate.getTime() - (180 * 24 * 60 * 60 * 1000 - 1))
-              setParams(prev => ({
-                ...prev,
-                startDate: startDate.toISOString().split('T')[0],
-                endDate: endDate.toISOString().split('T')[0]
-              }))
-            }}
-            className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-          >
-            Max (180 Days)
-          </button>
+          {!isSandbox && (
+            <>
+              <button
+                onClick={() => {
+                  const endDate = new Date()
+                  endDate.setUTCHours(23, 59, 59, 999)
+                  const startDate = new Date(endDate.getTime() - (90 * 24 * 60 * 60 * 1000 - 1))
+                  setParams(prev => ({
+                    ...prev,
+                    startDate: startDate.toISOString().split('T')[0],
+                    endDate: endDate.toISOString().split('T')[0]
+                  }))
+                }}
+                className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+              >
+                Last 90 Days
+              </button>
+              <button
+                onClick={() => {
+                  const endDate = new Date()
+                  endDate.setUTCHours(23, 59, 59, 999)
+                  const startDate = new Date(endDate.getTime() - (180 * 24 * 60 * 60 * 1000 - 1))
+                  setParams(prev => ({
+                    ...prev,
+                    startDate: startDate.toISOString().split('T')[0],
+                    endDate: endDate.toISOString().split('T')[0]
+                  }))
+                }}
+                className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+              >
+                Max (180 Days)
+              </button>
+            </>
+          )}
         </div>
         
         <div className="grid grid-cols-2 gap-4">

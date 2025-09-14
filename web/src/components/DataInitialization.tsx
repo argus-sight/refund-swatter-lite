@@ -158,23 +158,21 @@ export default function DataInitialization({ environment, onComplete }: DataInit
     'TEST'
   ]
 
+  // Check if Sandbox environment (max 30 days)
+  const isSandbox = environment === AppleEnvironment.SANDBOX
+  const maxDays = isSandbox ? 30 : 180
+
   return (
     <div className="bg-white rounded-lg shadow p-6">
       <h2 className="text-lg font-semibold mb-4">Data Initialization</h2>
       <p className="text-sm text-gray-600 mb-4">
-        Import historical notification data from Apple. Default: Last 30 days, Maximum: 180 days.
+        Import historical notification data from Apple. Default: Last 30 days, Maximum: {maxDays} days.
         Data is stored incrementally as each page is fetched.
       </p>
 
       <div className="space-y-4">
         {/* Quick date range presets */}
         <div className="flex gap-2">
-          <button
-            onClick={() => setDateRange(getDefaultDateRange())}
-            className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-          >
-            Last 30 Days
-          </button>
           <button
             onClick={() => {
               const endDate = new Date()
@@ -190,33 +188,43 @@ export default function DataInitialization({ environment, onComplete }: DataInit
             Last 7 Days
           </button>
           <button
-            onClick={() => {
-              const endDate = new Date()
-              endDate.setUTCHours(23, 59, 59, 999)
-              const startDate = new Date(endDate.getTime() - (90 * 24 * 60 * 60 * 1000 - 1))
-              setDateRange({
-                startDate: startDate.toISOString().split('T')[0],
-                endDate: endDate.toISOString().split('T')[0]
-              })
-            }}
+            onClick={() => setDateRange(getDefaultDateRange())}
             className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
           >
-            Last 90 Days
+            Last 30 Days
           </button>
-          <button
-            onClick={() => {
-              const endDate = new Date()
-              endDate.setUTCHours(23, 59, 59, 999)
-              const startDate = new Date(endDate.getTime() - (180 * 24 * 60 * 60 * 1000 - 1))
-              setDateRange({
-                startDate: startDate.toISOString().split('T')[0],
-                endDate: endDate.toISOString().split('T')[0]
-              })
-            }}
-            className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-          >
-            Max (180 Days)
-          </button>
+          {!isSandbox && (
+            <>
+              <button
+                onClick={() => {
+                  const endDate = new Date()
+                  endDate.setUTCHours(23, 59, 59, 999)
+                  const startDate = new Date(endDate.getTime() - (90 * 24 * 60 * 60 * 1000 - 1))
+                  setDateRange({
+                    startDate: startDate.toISOString().split('T')[0],
+                    endDate: endDate.toISOString().split('T')[0]
+                  })
+                }}
+                className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+              >
+                Last 90 Days
+              </button>
+              <button
+                onClick={() => {
+                  const endDate = new Date()
+                  endDate.setUTCHours(23, 59, 59, 999)
+                  const startDate = new Date(endDate.getTime() - (180 * 24 * 60 * 60 * 1000 - 1))
+                  setDateRange({
+                    startDate: startDate.toISOString().split('T')[0],
+                    endDate: endDate.toISOString().split('T')[0]
+                  })
+                }}
+                className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+              >
+                Max (180 Days)
+              </button>
+            </>
+          )}
         </div>
         
         <div className="grid grid-cols-2 gap-4">
@@ -358,8 +366,8 @@ export default function DataInitialization({ environment, onComplete }: DataInit
 
         <div className="text-xs text-gray-500">
           Note: This will fetch notifications from Apple for the {environment} environment.
-          {environment === 'Sandbox' 
-            ? 'Sandbox environment: Recommended to use 30 days or less for better data availability.'
+          {isSandbox 
+            ? 'Sandbox environment: Maximum date range is 30 days.'
             : 'Production environment: Maximum date range is 180 days.'}
           Data is stored incrementally as each page is fetched.
         </div>
