@@ -93,50 +93,24 @@ EOF
     echo -e "${GREEN}✓ web/.env created${NC}"
 fi
 
-# Step 4: Enable required extensions
-echo -e "${YELLOW}Step 4: Setting up required extensions...${NC}"
+# Step 4: Verify required extensions
+echo -e "${YELLOW}Step 4: Verifying required extensions...${NC}"
 echo ""
-
-# Create a migration file for extensions if it doesn't exist
-EXTENSION_MIGRATION="supabase/migrations/00000000000000_enable_extensions.sql"
-if [ ! -f "$EXTENSION_MIGRATION" ]; then
-    echo "Creating extension migration file..."
-    cat > "$EXTENSION_MIGRATION" << 'EOF'
--- Enable required extensions
-CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA extensions;
-CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
-CREATE EXTENSION IF NOT EXISTS vault WITH SCHEMA extensions;
-
--- Grant necessary permissions for pg_cron
-GRANT USAGE ON SCHEMA cron TO postgres;
-GRANT ALL ON ALL TABLES IN SCHEMA cron TO postgres;
-EOF
-    echo -e "${GREEN}✓ Extension migration created${NC}"
-else
-    echo -e "${GREEN}✓ Extension migration already exists${NC}"
-fi
-
-echo ""
-echo "Extensions will be enabled when database migrations are applied."
-echo "Required extensions: pg_cron, pg_net, vault"
+echo "Required extensions (pg_cron, pg_net, vault) will be enabled during migration."
+echo -e "${GREEN}✓ Extension setup included in baseline migration${NC}"
 
 # Step 5: Database migrations
 echo ""
 echo -e "${YELLOW}Step 5: Applying database migrations...${NC}"
-echo "This will create all necessary tables and functions."
+echo "Automatically applying all database migrations..."
 echo ""
-read -p "Do you want to apply database migrations now? (y/n): " -n 1 -r
-echo ""
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    if supabase db push --password "$SUPABASE_DB_PASSWORD"; then
-        echo -e "${GREEN}✓ Database migrations applied successfully${NC}"
-    else
-        echo -e "${RED}Failed to apply migrations. Please check the error above.${NC}"
-        echo "You can manually run: supabase db push --password YOUR_PASSWORD"
-    fi
+
+# Use yes command to auto-confirm all prompts
+if yes | supabase db push --password "$SUPABASE_DB_PASSWORD" 2>&1 | tee /tmp/migration_output.log; then
+    echo -e "${GREEN}✓ Database migrations applied successfully${NC}"
 else
-    echo -e "${YELLOW}Skipped database migrations.${NC}"
-    echo "You can apply them later with: supabase db push --password YOUR_PASSWORD"
+    echo -e "${RED}Failed to apply migrations. Please check the error above.${NC}"
+    echo "You can manually run: supabase db push --password YOUR_PASSWORD"
 fi
 
 # Step 6: Set secrets
@@ -196,49 +170,45 @@ else
     echo -e "${GREEN}✓ All Edge Functions deployed successfully${NC}"
 fi
 
-# Step 8: Setup cron job (via Supabase Dashboard)
+# Step 8: Setup cron job (optional)
 if [ "$SETUP_CRON" = "true" ]; then
     echo ""
-    echo -e "${YELLOW}Step 8: Setting up scheduled function${NC}"
-    
-    echo "  Please configure the cron schedule in Supabase Dashboard:"
+    echo -e "${YELLOW}Step 8: Scheduled Function Setup (Optional)${NC}"
     echo ""
-    echo "  1. Go to Cron Jobs section:"
-    echo "     https://supabase.com/dashboard/project/$SUPABASE_PROJECT_REF/integrations/cron-jobs"
+    echo "  A cron job can automatically process pending notifications every 5 minutes."
+    echo "  This is optional - notifications will still be processed when received."
+    echo ""
+    echo -e "${YELLOW}  ⚠️  Note: Cron jobs must be configured manually in Supabase Dashboard${NC}"
+    echo ""
+    echo "  To set up the cron job:"
+    echo ""
+    echo "  1. Open the Cron Jobs page in your dashboard:"
+    echo -e "     ${BLUE}https://supabase.com/dashboard/project/$SUPABASE_PROJECT_REF/integrations/cron-jobs${NC}"
     echo ""
     echo "  2. Click 'Create a new cron job'"
     echo ""
-    echo "  3. Configure with these settings:"
+    echo "  3. Fill in these settings:"
+    echo "     • Job name: process_notifications"
+    echo "     • Schedule: */5 * * * *"
+    echo "     • Type: HTTP Request"
+    echo "     • HTTP Method: POST"
+    echo "     • URL: ${API_URL}/functions/v1/process-notifications-cron"
     echo ""
-    echo "     Schedule (GMT):"
-    echo "     */5 * * * *  (every 5 minutes)"
+    echo "  4. Add Headers (click 'Add header' twice):"
+    echo "     • Authorization: Bearer ${SERVICE_ROLE_KEY}"
+    echo "     • Content-Type: application/json"
     echo ""
-    echo "     Type:"
-    echo "     Supabase Edge Function"
-    echo ""
-    echo "     Method:"
-    echo "     POST"
-    echo ""
-    echo "     Edge Function:"
-    echo "     process-notifications-cron"
-    echo ""
-    echo "     Timeout:"
-    echo "     3000 ms"
-    echo ""
-    echo "     HTTP Headers (click 'Add a new header' twice):"
-    echo "     Header 1:"
-    echo "       Name:  Authorization"
-    echo "       Value: Bearer ${SERVICE_ROLE_KEY}"
-    echo "     Header 2:"
-    echo "       Name:  Content-Type"  
-    echo "       Value: application/json"
-    echo ""
-    echo "     HTTP Request Body:"
+    echo "  5. Request Body:"
     echo "     {\"secret\": \"${CRON_SECRET}\"}"
     echo ""
-    echo "  4. Click 'Save cron job'"
+    echo "  6. Click 'Save'"
     echo ""
-    echo -e "${GREEN}✓ Cron job configuration values displayed above${NC}"
+    echo -e "${GREEN}  ✓ Cron job configuration displayed above${NC}"
+    echo -e "${YELLOW}  ℹ️  You can skip this step if you don't need automatic processing${NC}"
+else
+    echo ""
+    echo -e "${YELLOW}Step 8: Scheduled Function Setup${NC}"
+    echo -e "${YELLOW}  ℹ️  Skipped (SETUP_CRON=false). Notifications will be processed when received.${NC}"
 fi
 
 # Step 9: Create admin user
