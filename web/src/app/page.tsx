@@ -31,15 +31,32 @@ export default function Home() {
 
   const checkConfiguration = async () => {
     try {
-      const { data: config, error } = await supabase
-        .from('config')
-        .select('apple_issuer_id, apple_key_id, apple_private_key_id')
-        .single()
+      // Use Edge Function instead of REST API
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
+        setIsConfigured(false)
+        setConfigLoading(false)
+        return
+      }
 
-      if (error) {
-        console.error('Error checking configuration:', error)
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/config`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      )
+
+      if (!response.ok) {
+        console.error('Error checking configuration:', response.status)
         setIsConfigured(false)
       } else {
+        const config = await response.json()
+        
         // Check if all required fields are configured
         const configured = !!(
           config?.apple_issuer_id && 

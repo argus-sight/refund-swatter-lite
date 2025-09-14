@@ -35,14 +35,16 @@ serve(async (req) => {
         .from('config')
         .select('*')
         .eq('id', 1)
-        .single()
       
       if (error) {
         throw new Error(`Failed to fetch config: ${error.message}`)
       }
       
+      // Return first item if exists, otherwise return empty object
+      const config = data && data.length > 0 ? data[0] : {}
+      
       return new Response(
-        JSON.stringify(data || null),
+        JSON.stringify(config),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200 
@@ -58,11 +60,12 @@ serve(async (req) => {
       const { action, ...configData } = body
       
       // First, get existing config to merge with updates
-      const { data: existingConfig } = await supabase
+      const { data: existingData } = await supabase
         .from('config')
         .select('*')
         .eq('id', 1)
-        .single()
+      
+      const existingConfig = existingData && existingData.length > 0 ? existingData[0] : null
       
       // Merge existing config with new data
       const mergedConfig = existingConfig 
