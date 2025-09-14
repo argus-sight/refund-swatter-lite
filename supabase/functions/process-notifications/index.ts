@@ -101,12 +101,13 @@ serve(async (req) => {
       try {
         await processNotification(supabase, notification)
         
-        // Mark as processed
+        // Mark as processed and clear any previous error
         const { error: updateError } = await supabase
           .from('notifications_raw')
           .update({ 
             status: 'processed',
-            processed_at: new Date().toISOString()
+            processed_at: new Date().toISOString(),
+            error_message: null
           })
           .eq('id', notification.id)
 

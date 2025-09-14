@@ -138,13 +138,24 @@ export default function DataInitialization({ environment, onComplete }: DataInit
 
   const typeOptions = [
     'CONSUMPTION_REQUEST',
-    'INITIAL_BUY',
+    'DID_CHANGE_RENEWAL_PREF',
+    'DID_CHANGE_RENEWAL_STATUS',
+    'DID_FAIL_TO_RENEW',
     'DID_RENEW',
+    'EXPIRED',
+    'EXTERNAL_PURCHASE_TOKEN',
+    'GRACE_PERIOD_EXPIRED',
+    'OFFER_REDEEMED',
+    'ONE_TIME_CHARGE',
+    'PRICE_INCREASE',
     'REFUND',
     'REFUND_DECLINED',
-    'OFFER_REDEEMED',
-    'DID_CHANGE_RENEWAL_STATUS',
-    'SUBSCRIBED'
+    'REFUND_REVERSED',
+    'RENEWAL_EXTENDED',
+    'RENEWAL_EXTENSION',
+    'REVOKE',
+    'SUBSCRIBED',
+    'TEST'
   ]
 
   return (
