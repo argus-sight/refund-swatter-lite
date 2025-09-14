@@ -132,18 +132,17 @@ This will automatically:
 
 Access the web dashboard at `http://localhost:3000` and add:
 - **Bundle ID**: Your app's bundle identifier (e.g., `com.example.myapp`)
-- **Issuer ID**: From App Store Connect → Users and Access → Keys → Find your key → Copy Issuer ID (e.g., `69a6de70-03db-47e3-9c6a-9c9e8b9a8b7a`)
-- **Key ID**: From App Store Connect → Users and Access → Keys → Your key name → Copy Key ID (e.g., `2X9R4HXF34`)
-- **Private Key**: Content of your .p8 file downloaded from App Store Connect
-  - Navigate to: App Store Connect → Users and Access → Keys → App Store Server API
-  - Click "+" to create a new key or use existing
-  - Download the .p8 file (you can only download once!)
-  - Open the .p8 file with a text editor and copy entire content including:
-    ```
-    -----BEGIN PRIVATE KEY-----
-    MIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQg...
-    -----END PRIVATE KEY-----
-    ```
+- **Issuer ID**: From App Store Connect → Users and Access → Integrations → App Store Connect API
+  - Look at the "Issuer ID" field at the top (e.g., `12345678-1234-1234-1234-123456789abc`)
+- **Key ID**: From App Store Connect → Users and Access → Integrations → App Store Connect API
+  - Find your key in the "Active" section → Copy the KEY ID column value (e.g., `G4NMRJT7S4`)
+- **Private Key (App Store Connect API Key)**: Upload your .p8 file downloaded from App Store Connect
+  - Navigate to: App Store Connect → Users and Access → Integrations → App Store Connect API
+  - Click "Generate API Key" or "+" button to create a new key
+  - Select "Admin" access
+  - Download the .p8 file (IMPORTANT: you can only download once! Save it securely)
+  - In the dashboard, click "Choose File" or "Upload" button to upload the .p8 file directly
+  - File name example: `AuthKey_G4NMRJT7S4.p8`
 
 4. **Set webhook in App Store Connect**
 - Go to App Store Connect → My Apps → Your App → App Store Server Notifications
@@ -151,6 +150,40 @@ Access the web dashboard at `http://localhost:3000` and add:
 - **Production Server URL**: `https://[your-project-ref].supabase.co/functions/v1/webhook`
   - Example: `https://abcdefghijklmnop.supabase.co/functions/v1/webhook`
 - **Sandbox Server URL**: Same as production URL
+
+**⚠️ Important**: After configuring the webhook URLs, wait at least 10 minutes before testing notifications. App Store Connect needs time to update and propagate the webhook configuration. Testing immediately may result in failures.
+
+## Web Dashboard Deployment (Optional)
+
+The web dashboard runs locally by default (`http://localhost:3000`). You can optionally deploy it to a hosting service for easier access.
+
+### Deploy to Vercel (Recommended)
+
+1. **Connect Repository**
+   - Sign up for [Vercel](https://vercel.com)
+   - Import your GitHub repository
+   - Set root directory to `/web`
+
+2. **Configure Environment Variables** in Vercel:
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=https://[your-project-ref].supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+   SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+   ```
+
+3. **Deploy**
+   - Vercel will automatically build and deploy
+   - Access your dashboard at the provided Vercel URL
+
+### Self-Hosting Options
+
+You can also deploy the web dashboard to:
+- **Docker**: Build and run the containerized app
+- **VPS/Cloud Server**: Deploy as a Node.js application
+- **Static Hosting**: Export as static site (limited functionality)
+- **Other Platforms**: Netlify, Railway, Render, etc.
+
+The dashboard is a standard Next.js application and can be deployed anywhere that supports Node.js applications.
 
 ## Project Structure
 
