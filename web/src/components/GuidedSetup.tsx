@@ -4,12 +4,15 @@ import { useState, useEffect, useRef } from 'react'
 import { AppleEnvironment } from '@/lib/apple'
 import { getFromEdgeFunction, updateInEdgeFunction, callEdgeFunction } from '@/lib/edge-functions'
 import { supabase } from '@/lib/supabase'
+import { maskSensitiveInfo } from '@/lib/utils'
 import { 
   CheckCircleIcon,
   ArrowRightIcon,
   ArrowLeftIcon,
   DocumentDuplicateIcon,
-  InformationCircleIcon
+  InformationCircleIcon,
+  EyeIcon,
+  EyeSlashIcon
 } from '@heroicons/react/24/outline'
 import { CheckCircleIcon as CheckCircleIconSolid } from '@heroicons/react/24/solid'
 
@@ -108,6 +111,10 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
   // Input field editing states
   const [editingIssuerId, setEditingIssuerId] = useState(false)
   const [editingKeyId, setEditingKeyId] = useState(false)
+  
+  // Visibility states for sensitive fields
+  const [issuerIdVisible, setIssuerIdVisible] = useState(false)
+  const [keyIdVisible, setKeyIdVisible] = useState(false)
   
   useEffect(() => {
     loadConfig()
@@ -486,29 +493,56 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
                 <input
                   type="text"
                   id="issuerId"
-                  value={issuerId}
+                  value={editingIssuerId || issuerIdVisible ? issuerId : (issuerId ? maskSensitiveInfo(issuerId) : '')}
                   onChange={(e) => {
-                    setIssuerId(e.target.value)
-                    setEditingIssuerId(true)
+                    // Only allow changes when editing or visible
+                    if (editingIssuerId || issuerIdVisible) {
+                      setIssuerId(e.target.value)
+                    }
                   }}
                   onFocus={() => {
                     setEditingIssuerId(true)
+                    setIssuerIdVisible(true)
                   }}
-                  onBlur={() => setEditingIssuerId(false)}
+                  onBlur={() => {
+                    setEditingIssuerId(false)
+                    // Keep visible for a moment, then hide
+                    setTimeout(() => setIssuerIdVisible(false), 100)
+                  }}
                   placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  className="mt-1 block w-full px-3 py-2 pr-20 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                 />
-                {issuerId && !editingIssuerId && (
-                  <button
-                    type="button"
-                    onClick={() => setEditingIssuerId(true)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    title="Click to edit"
-                  >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </button>
+                {issuerId && (
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setIssuerIdVisible(!issuerIdVisible)}
+                      className="text-gray-400 hover:text-gray-600"
+                      title={issuerIdVisible ? 'Hide' : 'Show'}
+                    >
+                      {issuerIdVisible ? (
+                        <EyeSlashIcon className="h-4 w-4" />
+                      ) : (
+                        <EyeIcon className="h-4 w-4" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingIssuerId(true)
+                        setIssuerIdVisible(true)
+                        setTimeout(() => {
+                          document.getElementById('issuerId')?.focus()
+                        }, 0)
+                      }}
+                      className="text-gray-400 hover:text-gray-600"
+                      title="Click to edit"
+                    >
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                  </div>
                 )}
               </div>
               <div className="mt-2 bg-blue-50 p-3 rounded-md">
@@ -531,29 +565,56 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
                 <input
                   type="text"
                   id="keyId"
-                  value={keyId}
+                  value={editingKeyId || keyIdVisible ? keyId : (keyId ? maskSensitiveInfo(keyId) : '')}
                   onChange={(e) => {
-                    setKeyId(e.target.value)
-                    setEditingKeyId(true)
+                    // Only allow changes when editing or visible
+                    if (editingKeyId || keyIdVisible) {
+                      setKeyId(e.target.value)
+                    }
                   }}
                   onFocus={() => {
                     setEditingKeyId(true)
+                    setKeyIdVisible(true)
                   }}
-                  onBlur={() => setEditingKeyId(false)}
+                  onBlur={() => {
+                    setEditingKeyId(false)
+                    // Keep visible for a moment, then hide
+                    setTimeout(() => setKeyIdVisible(false), 100)
+                  }}
                   placeholder="XXXXXXXXXX"
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  className="mt-1 block w-full px-3 py-2 pr-20 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                 />
-                {keyId && !editingKeyId && (
-                  <button
-                    type="button"
-                    onClick={() => setEditingKeyId(true)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    title="Click to edit"
-                  >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </button>
+                {keyId && (
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setKeyIdVisible(!keyIdVisible)}
+                      className="text-gray-400 hover:text-gray-600"
+                      title={keyIdVisible ? 'Hide' : 'Show'}
+                    >
+                      {keyIdVisible ? (
+                        <EyeSlashIcon className="h-4 w-4" />
+                      ) : (
+                        <EyeIcon className="h-4 w-4" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingKeyId(true)
+                        setKeyIdVisible(true)
+                        setTimeout(() => {
+                          document.getElementById('keyId')?.focus()
+                        }, 0)
+                      }}
+                      className="text-gray-400 hover:text-gray-600"
+                      title="Click to edit"
+                    >
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                  </div>
                 )}
               </div>
               <div className="mt-2 bg-blue-50 p-3 rounded-md">
