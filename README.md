@@ -21,6 +21,10 @@
 </p>
 
 <p align="center">
+  <a href="https://www.producthunt.com/products/refund-swatter-lite?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-refund&#0045;swatter&#0045;lite" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1015309&theme=light&t=1757955852137" alt="Refund&#0032;Swatter&#0032;Lite - Stop&#0032;iOS&#0032;refund&#0032;abuse&#0032;—&#0032;an&#0032;open&#0045;source&#0032;developer&#0032;tool | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" /></a>
+</p>
+
+<p align="center">
   <a href="https://youtu.be/bQShJeDM5H0?quality=hd1080&utm_source=producthunt&utm_medium=github&utm_campaign=readme_hero" target="_blank">
     <img alt="RefundSwatterLite Demo" src="docs/assets/refund_swatter_lite_20250915.gif" width="800" />
   </a>
@@ -74,6 +78,7 @@ cp .env.project.example .env.project
 ```bash
 ./setup-simple.sh
 ```
+The script will output admin credentials (admin@refundswatter.com / ChangeMe123!) - change the password immediately after first login.
 
 3. **Start web dashboard and configure Apple credentials**
 ```bash
