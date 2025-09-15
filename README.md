@@ -14,15 +14,15 @@
 
 <p align="center">
   <a href="#quick-start"><img alt="Quick Install" src="https://img.shields.io/badge/Quick%20Install-setup--simple.sh-22c55e?logo=gnubash&logoColor=white"></a>
-  <a href="https://www.youtube.com/watch?v=j-88H8j7btI&utm_source=producthunt&utm_medium=github&utm_campaign=readme_top" target="_blank"><img alt="Demo Video" src="https://img.shields.io/badge/Demo-2%20min%20video-ff0000?logo=youtube&logoColor=white"></a>
+  <a href="https://youtu.be/ySMvpKkqnGU&utm_source=producthunt&utm_medium=github&utm_campaign=readme_top" target="_blank"><img alt="Demo Video" src="https://img.shields.io/badge/Demo-38%20sec%20video-ff0000?logo=youtube&logoColor=white"></a>
   <a href="https://github.com/argus-sight/refund-swatter-lite/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/argus-sight/refund-swatter-lite?style=social"></a>
   <a href="./README_zh.md"><img alt="中文" src="https://img.shields.io/badge/简体中文-README-blue"></a>
   <a href="#security"><img alt="You own your keys" src="https://img.shields.io/badge/You%20own%20your%20keys-BYOK-8b5cf6"></a>
 </p>
 
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=j-88H8j7btI&utm_source=producthunt&utm_medium=github&utm_campaign=readme_hero" target="_blank">
-    <img alt="RefundSwatterLite Demo" src="https://img.youtube.com/vi/j-88H8j7btI/maxresdefault.jpg" width="800" />
+  <a href="https://youtu.be/ySMvpKkqnGU&utm_source=producthunt&utm_medium=github&utm_campaign=readme_hero" target="_blank">
+    <img alt="RefundSwatterLite Demo" src="docs/assets/refund_swatter_lite_20250915.gif" width="800" />
   </a>
   <br/>
   <sub>Welcome, Product Hunters! Watch the demo and try the quick setup below.</sub>
