@@ -730,11 +730,11 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
                 Copy this webhook URL and configure it in App Store Connect for Server-to-Server Notification V2.
               </p>
               <ol className="mt-2 text-sm text-yellow-700 list-decimal list-inside space-y-1">
-                <li>Go to App Store Connect</li>
-                <li>Select your app</li>
-                <li>Navigate to App Information → Server Notifications</li>
-                <li>Enable Version 2 Notifications</li>
-                <li>Paste the webhook URL below</li>
+                <li>Go to App Store Connect → My Apps → Your App</li>
+                <li>Navigate to App Store Server Notifications</li>
+                <li>Click "Edit" for both Production and Sandbox</li>
+                <li>Set both Production and Sandbox Server URLs to the webhook URL below</li>
+                <li>Wait at least 10 minutes before testing (Apple needs time to propagate changes)</li>
               </ol>
             </div>
 
