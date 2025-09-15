@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 import { verifyAuth, handleCors, getCorsHeaders } from '../_shared/auth.ts'
+import { calculateConsumptionData } from '../_shared/consumption-calculator.ts'
 
 
 serve(async (req) => {
@@ -322,16 +323,17 @@ async function processConsumptionRequest(supabase: any, notification: any, trans
       .eq('notification_uuid', notification.notification_uuid)
   }
 
-  // Calculate consumption data using the database function
-  const { data: calculatedData, error: calcError } = await supabase
-    .rpc('calculate_consumption_data', {
-      p_original_transaction_id: originalTransactionId,
-      p_environment: environment
-    })
+  // Calculate consumption data using the shared module
+  const calculatedData = await calculateConsumptionData(
+    originalTransactionId,
+    environment,
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  )
 
-  if (calcError) {
-    console.error('Failed to calculate consumption data:', calcError)
-    throw new Error(`Failed to calculate consumption data: ${calcError.message}`)
+  if (!calculatedData) {
+    console.error('Failed to calculate consumption data: No data returned')
+    throw new Error('Failed to calculate consumption data: No data returned')
   }
 
   // Create send job with calculated data

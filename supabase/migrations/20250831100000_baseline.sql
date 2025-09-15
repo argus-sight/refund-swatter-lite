@@ -30,100 +30,7 @@ COMMENT ON SCHEMA "public" IS 'standard public schema';
 
 
 
-CREATE OR REPLACE FUNCTION "public"."calculate_consumption_data"("p_original_transaction_id" "text") RETURNS "jsonb"
-    LANGUAGE "plpgsql"
-    AS $_$
-DECLARE
-  v_result jsonb;
-  v_customer_consented boolean := true;
-  v_consumption_status integer := 0;
-  v_platform integer := 1; -- 1 for Apple platform (iOS purchases are from Apple)
-  v_sample_content_provided boolean := false;
-  v_delivery_status integer := 0;
-  v_app_account_token text;
-  v_lifetime_dollars_purchased numeric := 0;
-  v_lifetime_dollars_refunded numeric := 0;
-  v_lifetime_dollars_purchased_enum integer := 0;  -- Default to 0 (Undeclared)
-  v_lifetime_dollars_refunded_enum integer := 0;   -- Default to 0 (Undeclared)
-  v_user_status integer := 0;
-  v_account_tenure integer := 0;
-  v_play_time_minutes integer := 0;
-  v_play_time integer := 0;  -- Default to 0 (undeclared)
-  v_refund_preference integer := 0; -- 0 = undeclared
-  v_is_valid_uuid boolean := false;
-BEGIN
-  -- Get app_account_token from transaction
-  SELECT app_account_token INTO v_app_account_token
-  FROM transactions 
-  WHERE original_transaction_id = p_original_transaction_id
-  LIMIT 1;
-  
-  -- Check if app_account_token is a valid UUID (not null, not empty string, and valid UUID format)
-  IF v_app_account_token IS NOT NULL AND v_app_account_token != '' THEN
-    -- Check if it's a valid UUID format using regex
-    v_is_valid_uuid := v_app_account_token ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
-  END IF;
-
-  -- If app_account_token is not valid, set it to empty string for Apple API
-  IF v_app_account_token IS NULL THEN
-    v_app_account_token := '';
-  END IF;
-
-  -- Only calculate lifetime amounts if we have a valid UUID
-  IF v_is_valid_uuid THEN
-    -- Calculate lifetime dollars purchased for this specific user
-    SELECT COALESCE(SUM(price), 0) INTO v_lifetime_dollars_purchased
-    FROM transactions 
-    WHERE app_account_token = v_app_account_token
-      AND app_account_token != '';  -- Extra safety check
-
-    -- Calculate lifetime dollars refunded for this specific user
-    SELECT COALESCE(SUM(r.refund_amount), 0) INTO v_lifetime_dollars_refunded
-    FROM refunds r
-    JOIN transactions t ON r.original_transaction_id = t.original_transaction_id
-    WHERE t.app_account_token = v_app_account_token
-      AND t.app_account_token != '';  -- Extra safety check
-      
-    -- Convert to enum values
-    v_lifetime_dollars_purchased_enum := get_lifetime_dollars_enum(v_lifetime_dollars_purchased);
-    v_lifetime_dollars_refunded_enum := get_lifetime_dollars_enum(v_lifetime_dollars_refunded);
-  ELSE
-    -- If no valid app_account_token, both values should be 0 (Undeclared)
-    -- NOT 1 (0 USD), because we don't know the actual values
-    v_lifetime_dollars_purchased_enum := 0;
-    v_lifetime_dollars_refunded_enum := 0;
-  END IF;
-
-  -- Don't calculate play time - just keep it as 0 (undeclared)
-  -- This avoids providing potentially inaccurate play time data
-  v_play_time := 0;
-  
-  -- Build result JSON
-  v_result := jsonb_build_object(
-    'customerConsented', v_customer_consented,
-    'consumptionStatus', v_consumption_status,
-    'platform', v_platform,
-    'sampleContentProvided', v_sample_content_provided,
-    'deliveryStatus', v_delivery_status,
-    'appAccountToken', v_app_account_token,
-    'lifetimeDollarsPurchased', v_lifetime_dollars_purchased_enum,
-    'lifetimeDollarsRefunded', v_lifetime_dollars_refunded_enum,
-    'userStatus', v_user_status,
-    'accountTenure', v_account_tenure,
-    'playTime', v_play_time,
-    'refundPreference', v_refund_preference
-  );
-  
-  RETURN v_result;
-END;
-$_$;
-
-
-ALTER FUNCTION "public"."calculate_consumption_data"("p_original_transaction_id" "text") OWNER TO "postgres";
-
-
-COMMENT ON FUNCTION "public"."calculate_consumption_data"("p_original_transaction_id" "text") IS 'Calculates consumption data for Apple Store Server Notifications v2 with proper enum values';
-
+-- Function calculate_consumption_data removed - now implemented as Edge Function in _shared/consumption-calculator.ts
 
 
 CREATE OR REPLACE FUNCTION "public"."cleanup_old_data"("p_days_to_keep" integer DEFAULT 180) RETURNS "void"
@@ -349,48 +256,7 @@ $$;
 ALTER FUNCTION "public"."handle_updated_at"() OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."process_consumption_request"("p_request_id" "uuid") RETURNS "void"
-    LANGUAGE "plpgsql"
-    AS $$
-DECLARE
-    v_original_transaction_id TEXT;
-    v_consumption_data JSONB;
-BEGIN
-    -- Get the original transaction ID
-    SELECT original_transaction_id INTO v_original_transaction_id
-    FROM consumption_requests
-    WHERE id = p_request_id;
-    
-    IF v_original_transaction_id IS NULL THEN
-        RAISE EXCEPTION 'Consumption request not found: %', p_request_id;
-    END IF;
-    
-    -- Calculate consumption data
-    v_consumption_data := calculate_consumption_data(v_original_transaction_id);
-    
-    -- Create a job to send the consumption data
-    INSERT INTO send_consumption_jobs (
-        consumption_request_id,
-        consumption_data,
-        status,
-        scheduled_at
-    ) VALUES (
-        p_request_id,
-        v_consumption_data,
-        'pending',
-        NOW()
-    );
-    
-    -- Update request status
-    UPDATE consumption_requests
-    SET status = 'calculating',
-        updated_at = NOW()
-    WHERE id = p_request_id;
-END;
-$$;
-
-
-ALTER FUNCTION "public"."process_consumption_request"("p_request_id" "uuid") OWNER TO "postgres";
+-- Function process_consumption_request removed - functionality handled by process-notifications Edge Function
 
 
 CREATE OR REPLACE FUNCTION "public"."process_pending_notifications_direct"() RETURNS "void"
@@ -1201,10 +1067,7 @@ GRANT USAGE ON SCHEMA "public" TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."calculate_consumption_data"("p_original_transaction_id" "text") TO "anon";
-GRANT ALL ON FUNCTION "public"."calculate_consumption_data"("p_original_transaction_id" "text") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."calculate_consumption_data"("p_original_transaction_id" "text") TO "service_role";
-
+-- GRANT statements for calculate_consumption_data removed - function moved to Edge Function
 
 
 GRANT ALL ON FUNCTION "public"."cleanup_old_data"("p_days_to_keep" integer) TO "anon";
@@ -1255,10 +1118,7 @@ GRANT ALL ON FUNCTION "public"."handle_updated_at"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."process_consumption_request"("p_request_id" "uuid") TO "anon";
-GRANT ALL ON FUNCTION "public"."process_consumption_request"("p_request_id" "uuid") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."process_consumption_request"("p_request_id" "uuid") TO "service_role";
-
+-- GRANT statements for process_consumption_request removed - function moved to Edge Function
 
 
 GRANT ALL ON FUNCTION "public"."process_pending_notifications_direct"() TO "anon";
