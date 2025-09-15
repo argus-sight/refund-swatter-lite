@@ -9,9 +9,7 @@ import {
   ArrowRightIcon,
   ArrowLeftIcon,
   DocumentDuplicateIcon,
-  InformationCircleIcon,
-  EyeIcon,
-  EyeSlashIcon
+  InformationCircleIcon
 } from '@heroicons/react/24/outline'
 import { CheckCircleIcon as CheckCircleIconSolid } from '@heroicons/react/24/solid'
 
@@ -79,7 +77,6 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
   
   // Step 2: P8 Key
   const [privateKey, setPrivateKey] = useState('')
-  const [privateKeyUploaded, setPrivateKeyUploaded] = useState(false)
   
   // Step 3: Webhook
   const [webhookUrl, setWebhookUrl] = useState(() => {
@@ -108,71 +105,14 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
   // Step 5: Refund Preference
   const [refundPreference, setRefundPreference] = useState(0)
   
-  // Masking states for sensitive fields  
-  const [showIssuerId, setShowIssuerId] = useState(false)
-  const [showKeyId, setShowKeyId] = useState(false)
-  
   // Input field editing states
   const [editingIssuerId, setEditingIssuerId] = useState(false)
   const [editingKeyId, setEditingKeyId] = useState(false)
-  
-  // Timeout refs for auto-hiding sensitive fields
-  const issuerIdTimeoutRef = useRef<NodeJS.Timeout>()
-  const keyIdTimeoutRef = useRef<NodeJS.Timeout>()
-  
-  // Utility function to mask sensitive values
-  const maskSensitiveValue = (value: string, showFirst = 6, showLast = 4) => {
-    if (!value || value.length <= showFirst + showLast) {
-      return '•'.repeat(Math.min(value?.length || 0, 12))
-    }
-    const firstPart = value.substring(0, showFirst)
-    const lastPart = value.substring(value.length - showLast)
-    const middlePart = '•'.repeat(Math.min(value.length - showFirst - showLast, 8))
-    return `${firstPart}${middlePart}${lastPart}`
-  }
-
-  // Auto-hide sensitive fields after showing them
-  const toggleSensitiveField = (field: 'issuerId' | 'keyId', currentState: boolean) => {
-    if (field === 'issuerId') {
-      // Clear existing timeout
-      if (issuerIdTimeoutRef.current) {
-        clearTimeout(issuerIdTimeoutRef.current)
-      }
-      
-      setShowIssuerId(!currentState)
-      if (!currentState) {
-        // Set new timeout to auto-hide
-        issuerIdTimeoutRef.current = setTimeout(() => setShowIssuerId(false), 5000)
-      }
-    } else if (field === 'keyId') {
-      // Clear existing timeout
-      if (keyIdTimeoutRef.current) {
-        clearTimeout(keyIdTimeoutRef.current)
-      }
-      
-      setShowKeyId(!currentState)
-      if (!currentState) {
-        // Set new timeout to auto-hide
-        keyIdTimeoutRef.current = setTimeout(() => setShowKeyId(false), 5000)
-      }
-    }
-  }
   
   useEffect(() => {
     loadConfig()
   }, [])
 
-  // Cleanup timeouts on unmount
-  useEffect(() => {
-    return () => {
-      if (issuerIdTimeoutRef.current) {
-        clearTimeout(issuerIdTimeoutRef.current)
-      }
-      if (keyIdTimeoutRef.current) {
-        clearTimeout(keyIdTimeoutRef.current)
-      }
-    }
-  }, [])
 
   const loadConfig = async () => {
     try {
@@ -185,7 +125,12 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
         setBundleId(data.bundle_id ?? '')
         setIssuerId(data.apple_issuer_id ?? '')
         setKeyId(data.apple_key_id ?? '')
-        if (data.apple_private_key) setPrivateKeyUploaded(true)
+        if (data.apple_private_key_id) {
+          // Mark P8 key step as completed if already configured
+          const newSteps = [...STEPS]
+          newSteps[1].completed = true
+          setSteps(newSteps)
+        }
         setRefundPreference(data.refund_preference !== null && data.refund_preference !== undefined ? data.refund_preference : 0)
       }
     } catch (error) {
@@ -233,7 +178,7 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
       newSteps[0].completed = true
       setSteps(newSteps)
       
-      // Move to next step
+      // Always go to P8 Key step, don't skip
       setError('')
       setCurrentStep(1)
     } catch (err) {
@@ -261,8 +206,6 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
         throw new Error(setupError.message || 'Failed to store private key')
       }
 
-      setPrivateKeyUploaded(true)
-      
       // Mark step as completed
       const newSteps = [...steps]
       newSteps[1].completed = true
@@ -500,72 +443,6 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
     setTimeout(() => setWebhookCopied(false), 2000)
   }
 
-  const renderConfigurationStatus = () => {
-    if (!config) return null
-    
-    return (
-      <div className="mb-6 bg-gray-50 rounded-lg p-4">
-        <h3 className="text-sm font-medium text-gray-900 mb-3">Configuration Status</h3>
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">Bundle ID:</span>
-            <div className="flex items-center space-x-2">
-              <span className="text-sm font-mono text-gray-900">
-                {bundleId}
-              </span>
-            </div>
-          </div>
-          
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">Issuer ID:</span>
-            <div className="flex items-center space-x-2">
-              <span className="text-sm font-mono text-gray-900">
-                {showIssuerId ? issuerId : maskSensitiveValue(issuerId, 6, 4)}
-              </span>
-              <button
-                onClick={() => toggleSensitiveField('issuerId', showIssuerId)}
-                className="text-gray-400 hover:text-gray-600"
-                title={showIssuerId ? 'Hide Issuer ID' : 'Show Issuer ID (auto-hide in 5s)'}
-              >
-                {showIssuerId ? (
-                  <EyeSlashIcon className="h-4 w-4" />
-                ) : (
-                  <EyeIcon className="h-4 w-4" />
-                )}
-              </button>
-            </div>
-          </div>
-          
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">Key ID:</span>
-            <div className="flex items-center space-x-2">
-              <span className="text-sm font-mono text-gray-900">
-                {showKeyId ? keyId : maskSensitiveValue(keyId, 2, 2)}
-              </span>
-              <button
-                onClick={() => toggleSensitiveField('keyId', showKeyId)}
-                className="text-gray-400 hover:text-gray-600"
-                title={showKeyId ? 'Hide Key ID' : 'Show Key ID (auto-hide in 5s)'}
-              >
-                {showKeyId ? (
-                  <EyeSlashIcon className="h-4 w-4" />
-                ) : (
-                  <EyeIcon className="h-4 w-4" />
-                )}
-              </button>
-            </div>
-          </div>
-          
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">In-App Purchase Key:</span>
-            <span className={`text-sm ${privateKeyUploaded ? 'text-green-600' : 'text-gray-400'}`}>
-              {privateKeyUploaded ? 'Configured' : 'Not Configured'}
-            </span>
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   const renderStepContent = () => {
     switch (currentStep) {
@@ -609,7 +486,7 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
                 <input
                   type="text"
                   id="issuerId"
-                  value={editingIssuerId || !issuerId ? issuerId : maskSensitiveValue(issuerId, 6, 4)}
+                  value={issuerId}
                   onChange={(e) => {
                     setIssuerId(e.target.value)
                     setEditingIssuerId(true)
@@ -654,7 +531,7 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
                 <input
                   type="text"
                   id="keyId"
-                  value={editingKeyId || !keyId ? keyId : maskSensitiveValue(keyId, 2, 2)}
+                  value={keyId}
                   onChange={(e) => {
                     setKeyId(e.target.value)
                     setEditingKeyId(true)
@@ -704,57 +581,113 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
       case 1: // Upload P8 Key
         return (
           <div className="space-y-4">
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <h3 className="text-sm font-medium text-blue-900">About the In-App Purchase Key</h3>
-              <p className="mt-1 text-sm text-blue-700">
-                The P8 In-App Purchase Key is used to authenticate API requests to Apple's servers.
-              </p>
-              <div className="mt-3">
-                <p className="text-xs text-blue-800 font-medium">How to create and download the P8 key:</p>
-                <ol className="mt-1 text-xs text-blue-700 space-y-1">
-                  <li>1. Go to App Store Connect → Users and Access → Integrations</li>
-                  <li>2. In the "In-App Purchase" section, click "Generate In-App Purchase Key" or "+" button</li>
-                  <li>3. Enter a name for your key (e.g., "in_app_purchase_key")</li>
-                  <li>4. Click "Generate"</li>
-                  <li>5. Download the .p8 file immediately (you can only download it once!)</li>
-                  <li>6. Save the file securely - you'll need to upload it below</li>
-                </ol>
-                <p className="mt-2 text-xs text-amber-600 font-medium">⚠️ Important: You can only download the key once. Save it securely!</p>
-              </div>
-            </div>
+            {config?.apple_private_key_id ? (
+              // Already configured - show simplified interface
+              <div className="space-y-4">
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <h3 className="text-sm font-medium text-green-900 flex items-center">
+                    <CheckCircleIconSolid className="h-5 w-5 mr-2" />
+                    In-App Purchase Key Already Configured
+                  </h3>
+                  <p className="mt-1 text-sm text-green-700">
+                    Your P8 In-App Purchase Key is already uploaded and ready to use. You can continue to the next step or upload a new key if needed.
+                  </p>
+                </div>
 
-            <div>
-              <label htmlFor="privateKeyFile" className="block text-sm font-medium text-gray-700">
-                In-App Purchase Key (.p8 file)
-              </label>
-              <div className="mt-1">
-                <input
-                  type="file"
-                  id="privateKeyFile"
-                  accept=".p8"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0]
-                    if (file) {
-                      const content = await file.text()
-                      setPrivateKey(content)
-                    }
-                  }}
-                  className="block w-full text-sm text-gray-900 border border-gray-300 rounded-md cursor-pointer focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 file:mr-4 file:py-2 file:px-4 file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
-                />
-                {privateKey && (
-                  <p className="mt-2 text-sm text-green-600 flex items-center">
-                    <CheckCircleIconSolid className="h-4 w-4 mr-1" />
-                    Private key loaded
-                  </p>
-                )}
-                {privateKeyUploaded && !privateKey && (
-                  <p className="mt-2 text-sm text-green-600 flex items-center">
-                    <CheckCircleIconSolid className="h-4 w-4 mr-1" />
-                    Private key already uploaded
-                  </p>
-                )}
+                {/* Optional: Upload new key section (collapsed by default) */}
+                <details className="bg-gray-50 p-4 rounded-lg">
+                  <summary className="text-sm font-medium text-gray-700 cursor-pointer hover:text-gray-900">
+                    Upload a new P8 key (optional)
+                  </summary>
+                  <div className="mt-4 space-y-3">
+                    <div>
+                      <label htmlFor="privateKeyFile" className="block text-sm font-medium text-gray-700">
+                        In-App Purchase Key (.p8 file)
+                      </label>
+                      <div className="mt-1">
+                        <input
+                          type="file"
+                          id="privateKeyFile"
+                          accept=".p8"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              const content = await file.text()
+                              setPrivateKey(content)
+                            }
+                          }}
+                          className="block w-full text-sm text-gray-900 border border-gray-300 rounded-md cursor-pointer focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 file:mr-4 file:py-2 file:px-4 file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                        />
+                        {privateKey && (
+                          <p className="mt-2 text-sm text-green-600 flex items-center">
+                            <CheckCircleIconSolid className="h-4 w-4 mr-1" />
+                            New private key loaded
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    {privateKey && (
+                      <button
+                        onClick={handlePrivateKeyUpload}
+                        disabled={loading}
+                        className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                      >
+                        {loading ? 'Uploading...' : 'Upload New Key'}
+                      </button>
+                    )}
+                  </div>
+                </details>
               </div>
-            </div>
+            ) : (
+              // Not configured - show full upload interface
+              <div className="space-y-4">
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <h3 className="text-sm font-medium text-blue-900">About the In-App Purchase Key</h3>
+                  <p className="mt-1 text-sm text-blue-700">
+                    The P8 In-App Purchase Key is used to authenticate API requests to Apple's servers.
+                  </p>
+                  <div className="mt-3">
+                    <p className="text-xs text-blue-800 font-medium">How to create and download the P8 key:</p>
+                    <ol className="mt-1 text-xs text-blue-700 space-y-1">
+                      <li>1. Go to App Store Connect → Users and Access → Integrations</li>
+                      <li>2. In the "In-App Purchase" section, click "Generate In-App Purchase Key" or "+" button</li>
+                      <li>3. Enter a name for your key (e.g., "in_app_purchase_key")</li>
+                      <li>4. Click "Generate"</li>
+                      <li>5. Download the .p8 file immediately (you can only download it once!)</li>
+                      <li>6. Save the file securely - you'll need to upload it below</li>
+                    </ol>
+                    <p className="mt-2 text-xs text-amber-600 font-medium">⚠️ Important: You can only download the key once. Save it securely!</p>
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="privateKeyFile" className="block text-sm font-medium text-gray-700">
+                    In-App Purchase Key (.p8 file)
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      type="file"
+                      id="privateKeyFile"
+                      accept=".p8"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          const content = await file.text()
+                          setPrivateKey(content)
+                        }
+                      }}
+                      className="block w-full text-sm text-gray-900 border border-gray-300 rounded-md cursor-pointer focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 file:mr-4 file:py-2 file:px-4 file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                    />
+                    {privateKey && (
+                      <p className="mt-2 text-sm text-green-600 flex items-center">
+                        <CheckCircleIconSolid className="h-4 w-4 mr-1" />
+                        Private key loaded
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="flex space-x-3">
               <button
@@ -768,11 +701,21 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
                 Back
               </button>
               <button
-                onClick={handlePrivateKeyUpload}
-                disabled={loading || (!privateKey && !privateKeyUploaded)}
+                onClick={() => {
+                  if (privateKey) {
+                    // Upload new key
+                    handlePrivateKeyUpload()
+                  } else if (config?.apple_private_key_id) {
+                    // Already configured, continue to next step
+                    setCurrentStep(2)
+                  }
+                }}
+                disabled={loading || (!privateKey && !config?.apple_private_key_id)}
                 className="flex-1 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
               >
-                {loading ? 'Uploading...' : privateKeyUploaded && !privateKey ? 'Continue' : 'Upload and Continue'}
+                {loading ? 'Processing...' : 
+                 privateKey ? 'Upload and Continue' :
+                 config?.apple_private_key_id ? 'Continue' : 'Continue'}
               </button>
             </div>
           </div>
@@ -1531,8 +1474,6 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
             </div>
           )}
 
-          {/* Show configuration status after Apple Configuration is completed */}
-          {currentStep > 0 && steps[0]?.completed && renderConfigurationStatus()}
 
           {/* Force remount between steps to avoid controlled/uncontrolled input reuse */}
           <div key={currentStep}>
