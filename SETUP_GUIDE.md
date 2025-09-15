@@ -142,15 +142,6 @@ The web dashboard runs locally by default (`http://localhost:3000`). You can opt
   - Vercel will automatically build and deploy
   - Access your dashboard at the provided Vercel URL
 
-### Self-Hosting Options
-
-You can also deploy the web dashboard to:
-- **Docker**: Build and run the containerized app
-- **VPS/Cloud Server**: Deploy as a Node.js application
-- **Static Hosting**: Export as static site (limited functionality)
-- **Other Platforms**: Netlify, Railway, Render, etc.
-
-The dashboard is a standard Next.js application and can be deployed anywhere that supports Node.js applications.
 
 ## Manual Setup (Alternative)
 
@@ -230,30 +221,6 @@ SELECT cron.schedule(
 - Send consumption data to Apple
 - Retry failed jobs automatically
 
-## Testing
-
-### Test Webhook
-```bash
-curl -X POST http://localhost:3000/api/test-webhook \
-  -H "Content-Type: application/json" \
-  -d '{"environment": "Sandbox"}'
-```
-
-### Check Status
-```bash
-curl http://localhost:3000/api/test-webhook/status
-```
-
-### Initialize Historical Data
-```bash
-curl -X POST http://localhost:3000/api/data-initialization \
-  -H "Content-Type: application/json" \
-  -d '{
-    "environment": "Production",
-    "startDate": 1704067200000,
-    "endDate": 1735689600000
-  }'
-```
 
 ## Troubleshooting
 
