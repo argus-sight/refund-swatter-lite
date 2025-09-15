@@ -274,7 +274,7 @@ export default function Dashboard() {
                 <MaskedValue 
                   label="Bundle ID" 
                   value={config?.bundle_id}
-                  maskByDefault={false}
+                  maskByDefault={true}
                 />
                 <MaskedValue 
                   label="Issuer ID" 
