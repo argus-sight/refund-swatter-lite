@@ -1349,7 +1349,10 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
             </div>
           )}
 
-          {renderStepContent()}
+          {/* Force remount between steps to avoid controlled/uncontrolled input reuse */}
+          <div key={currentStep}>
+            {renderStepContent()}
+          </div>
         </div>
       </div>
     </div>
