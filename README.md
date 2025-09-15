@@ -171,20 +171,20 @@ The web dashboard runs locally by default (`http://localhost:3000`). You can opt
 ### Deploy to Vercel (Recommended)
 
 1. **Connect Repository**
-   - Sign up for [Vercel](https://vercel.com)
-   - Import your GitHub repository
-   - Set root directory to `/web`
+  - Sign up for [Vercel](https://vercel.com)
+  - Import your GitHub repository
+  - Set root directory to `/web`
 
 2. **Configure Environment Variables** in Vercel:
-   ```
-   NEXT_PUBLIC_SUPABASE_URL=https://[your-project-ref].supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-   SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-   ```
+  ```
+  NEXT_PUBLIC_SUPABASE_URL=https://[your-project-ref].supabase.co
+  NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+  SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+  ```
 
 3. **Deploy**
-   - Vercel will automatically build and deploy
-   - Access your dashboard at the provided Vercel URL
+  - Vercel will automatically build and deploy
+  - Access your dashboard at the provided Vercel URL
 
 ### Self-Hosting Options
 
@@ -226,10 +226,6 @@ refund-swatter-lite/
 - Ensure Edge Functions are deployed
 - Ensure JWT verification is disabled for webhook Edge Function
 
-**Consumption data not sending**
-- Verify cron job is running
-- Check Apple credentials in config table
-- Review errors in `send_consumption_jobs` table
 
 **Test notification failing**
 - Ensure correct environment selected
