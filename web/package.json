@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Dashboard for Refund Swatter Lite",
   "scripts": {
-    "dev": "next dev -p 3300",
+    "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
