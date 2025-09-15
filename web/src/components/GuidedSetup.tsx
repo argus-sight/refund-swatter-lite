@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { AppleEnvironment } from '@/lib/apple'
 import { getFromEdgeFunction, updateInEdgeFunction, callEdgeFunction } from '@/lib/edge-functions'
 import { supabase } from '@/lib/supabase'
@@ -9,7 +9,9 @@ import {
   ArrowRightIcon,
   ArrowLeftIcon,
   DocumentDuplicateIcon,
-  InformationCircleIcon
+  InformationCircleIcon,
+  EyeIcon,
+  EyeSlashIcon
 } from '@heroicons/react/24/outline'
 import { CheckCircleIcon as CheckCircleIconSolid } from '@heroicons/react/24/solid'
 
@@ -106,8 +108,70 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
   // Step 5: Refund Preference
   const [refundPreference, setRefundPreference] = useState(0)
   
+  // Masking states for sensitive fields  
+  const [showIssuerId, setShowIssuerId] = useState(false)
+  const [showKeyId, setShowKeyId] = useState(false)
+  
+  // Input field editing states
+  const [editingIssuerId, setEditingIssuerId] = useState(false)
+  const [editingKeyId, setEditingKeyId] = useState(false)
+  
+  // Timeout refs for auto-hiding sensitive fields
+  const issuerIdTimeoutRef = useRef<NodeJS.Timeout>()
+  const keyIdTimeoutRef = useRef<NodeJS.Timeout>()
+  
+  // Utility function to mask sensitive values
+  const maskSensitiveValue = (value: string, showFirst = 6, showLast = 4) => {
+    if (!value || value.length <= showFirst + showLast) {
+      return '•'.repeat(Math.min(value?.length || 0, 12))
+    }
+    const firstPart = value.substring(0, showFirst)
+    const lastPart = value.substring(value.length - showLast)
+    const middlePart = '•'.repeat(Math.min(value.length - showFirst - showLast, 8))
+    return `${firstPart}${middlePart}${lastPart}`
+  }
+
+  // Auto-hide sensitive fields after showing them
+  const toggleSensitiveField = (field: 'issuerId' | 'keyId', currentState: boolean) => {
+    if (field === 'issuerId') {
+      // Clear existing timeout
+      if (issuerIdTimeoutRef.current) {
+        clearTimeout(issuerIdTimeoutRef.current)
+      }
+      
+      setShowIssuerId(!currentState)
+      if (!currentState) {
+        // Set new timeout to auto-hide
+        issuerIdTimeoutRef.current = setTimeout(() => setShowIssuerId(false), 5000)
+      }
+    } else if (field === 'keyId') {
+      // Clear existing timeout
+      if (keyIdTimeoutRef.current) {
+        clearTimeout(keyIdTimeoutRef.current)
+      }
+      
+      setShowKeyId(!currentState)
+      if (!currentState) {
+        // Set new timeout to auto-hide
+        keyIdTimeoutRef.current = setTimeout(() => setShowKeyId(false), 5000)
+      }
+    }
+  }
+  
   useEffect(() => {
     loadConfig()
+  }, [])
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (issuerIdTimeoutRef.current) {
+        clearTimeout(issuerIdTimeoutRef.current)
+      }
+      if (keyIdTimeoutRef.current) {
+        clearTimeout(keyIdTimeoutRef.current)
+      }
+    }
   }, [])
 
   const loadConfig = async () => {
@@ -436,6 +500,73 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
     setTimeout(() => setWebhookCopied(false), 2000)
   }
 
+  const renderConfigurationStatus = () => {
+    if (!config) return null
+    
+    return (
+      <div className="mb-6 bg-gray-50 rounded-lg p-4">
+        <h3 className="text-sm font-medium text-gray-900 mb-3">Configuration Status</h3>
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-600">Bundle ID:</span>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm font-mono text-gray-900">
+                {bundleId}
+              </span>
+            </div>
+          </div>
+          
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-600">Issuer ID:</span>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm font-mono text-gray-900">
+                {showIssuerId ? issuerId : maskSensitiveValue(issuerId, 6, 4)}
+              </span>
+              <button
+                onClick={() => toggleSensitiveField('issuerId', showIssuerId)}
+                className="text-gray-400 hover:text-gray-600"
+                title={showIssuerId ? 'Hide Issuer ID' : 'Show Issuer ID (auto-hide in 5s)'}
+              >
+                {showIssuerId ? (
+                  <EyeSlashIcon className="h-4 w-4" />
+                ) : (
+                  <EyeIcon className="h-4 w-4" />
+                )}
+              </button>
+            </div>
+          </div>
+          
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-600">Key ID:</span>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm font-mono text-gray-900">
+                {showKeyId ? keyId : maskSensitiveValue(keyId, 2, 2)}
+              </span>
+              <button
+                onClick={() => toggleSensitiveField('keyId', showKeyId)}
+                className="text-gray-400 hover:text-gray-600"
+                title={showKeyId ? 'Hide Key ID' : 'Show Key ID (auto-hide in 5s)'}
+              >
+                {showKeyId ? (
+                  <EyeSlashIcon className="h-4 w-4" />
+                ) : (
+                  <EyeIcon className="h-4 w-4" />
+                )}
+              </button>
+            </div>
+          </div>
+          
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-600">In-App Purchase Key:</span>
+            <span className={`text-sm ${privateKeyUploaded ? 'text-green-600' : 'text-gray-400'}`}>
+              {privateKeyUploaded ? 'Configured' : 'Not Configured'}
+            </span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const renderStepContent = () => {
     switch (currentStep) {
       case 0: // Apple Configuration
@@ -474,14 +605,35 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
               <label htmlFor="issuerId" className="block text-sm font-medium text-gray-700">
                 Issuer ID
               </label>
-              <input
-                type="text"
-                id="issuerId"
-                value={issuerId}
-                onChange={(e) => setIssuerId(e.target.value)}
-                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  id="issuerId"
+                  value={editingIssuerId || !issuerId ? issuerId : maskSensitiveValue(issuerId, 6, 4)}
+                  onChange={(e) => {
+                    setIssuerId(e.target.value)
+                    setEditingIssuerId(true)
+                  }}
+                  onFocus={() => {
+                    setEditingIssuerId(true)
+                  }}
+                  onBlur={() => setEditingIssuerId(false)}
+                  placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                />
+                {issuerId && !editingIssuerId && (
+                  <button
+                    type="button"
+                    onClick={() => setEditingIssuerId(true)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    title="Click to edit"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </button>
+                )}
+              </div>
               <div className="mt-2 bg-blue-50 p-3 rounded-md">
                 <p className="text-xs text-blue-800 font-medium">How to get Issuer ID:</p>
                 <ol className="mt-1 text-xs text-blue-700 space-y-1">
@@ -498,14 +650,35 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
               <label htmlFor="keyId" className="block text-sm font-medium text-gray-700">
                 Key ID
               </label>
-              <input
-                type="text"
-                id="keyId"
-                value={keyId}
-                onChange={(e) => setKeyId(e.target.value)}
-                placeholder="XXXXXXXXXX"
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  id="keyId"
+                  value={editingKeyId || !keyId ? keyId : maskSensitiveValue(keyId, 2, 2)}
+                  onChange={(e) => {
+                    setKeyId(e.target.value)
+                    setEditingKeyId(true)
+                  }}
+                  onFocus={() => {
+                    setEditingKeyId(true)
+                  }}
+                  onBlur={() => setEditingKeyId(false)}
+                  placeholder="XXXXXXXXXX"
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                />
+                {keyId && !editingKeyId && (
+                  <button
+                    type="button"
+                    onClick={() => setEditingKeyId(true)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    title="Click to edit"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </button>
+                )}
+              </div>
               <div className="mt-2 bg-blue-50 p-3 rounded-md">
                 <p className="text-xs text-blue-800 font-medium">How to get Key ID:</p>
                 <ol className="mt-1 text-xs text-blue-700 space-y-1">
@@ -1287,12 +1460,22 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
         {/* Progress Steps */}
         <div className="px-8 pt-8">
           <nav aria-label="Progress">
-            <ol className="flex items-center">
+            <ol className="flex w-full">
               {steps.map((step, index) => (
-                <li key={index} className={`relative ${index !== steps.length - 1 ? 'pr-8 sm:pr-20' : ''} flex-1`}>
-                  <div className="flex items-center">
+                <li key={index} className="relative flex-1 flex flex-col items-center">
+                  {/* Circle and connecting line container */}
+                  <div className="flex items-center w-full justify-center">
+                    {/* Left connecting line */}
+                    {index > 0 && (
+                      <div className={`
+                        flex-1 h-0.5 mr-2
+                        ${index - 1 < currentStep ? 'bg-indigo-600' : 'bg-gray-300'}
+                      `} />
+                    )}
+                    
+                    {/* Circle */}
                     <div className={`
-                      relative flex h-8 w-8 items-center justify-center rounded-full
+                      flex h-8 w-8 items-center justify-center rounded-full flex-shrink-0
                       ${index < currentStep || step.completed
                         ? 'bg-indigo-600'
                         : index === currentStep
@@ -1303,25 +1486,31 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
                       {step.completed ? (
                         <CheckCircleIconSolid className="h-5 w-5 text-white" />
                       ) : (
-                        <span className={`text-xs ${index === currentStep ? 'text-indigo-600' : 'text-gray-500'}`}>
+                        <span className={`text-xs font-semibold ${index === currentStep ? 'text-indigo-600' : 'text-gray-500'}`}>
                           {index + 1}
                         </span>
                       )}
                     </div>
-                    {index !== steps.length - 1 && (
+                    
+                    {/* Right connecting line */}
+                    {index < steps.length - 1 && (
                       <div className={`
-                        absolute top-4 left-8 -ml-px w-full h-0.5
+                        flex-1 h-0.5 ml-2
                         ${index < currentStep ? 'bg-indigo-600' : 'bg-gray-300'}
                       `} />
                     )}
                   </div>
-                  <div className="mt-2">
-                    <span className={`text-xs font-medium ${
+                  
+                  {/* Step label */}
+                  <div className="mt-3 text-center max-w-20">
+                    <span className={`text-xs font-medium block ${
                       index <= currentStep ? 'text-indigo-600' : 'text-gray-500'
                     }`}>
                       {step.title}
-                      {step.optional && <span className="text-gray-400 ml-1">(Optional)</span>}
                     </span>
+                    {step.optional && (
+                      <span className="text-gray-400 text-xs block mt-0.5">(Optional)</span>
+                    )}
                   </div>
                 </li>
               ))}
@@ -1341,6 +1530,9 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
               <p className="text-sm text-red-600">{error}</p>
             </div>
           )}
+
+          {/* Show configuration status after Apple Configuration is completed */}
+          {currentStep > 0 && steps[0]?.completed && renderConfigurationStatus()}
 
           {/* Force remount between steps to avoid controlled/uncontrolled input reuse */}
           <div key={currentStep}>
