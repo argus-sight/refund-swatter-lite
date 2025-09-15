@@ -51,15 +51,15 @@ const STEPS: StepProps[] = [
     completed: false
   },
   {
-    title: 'Important Information',
-    description: 'Review consumption info defaults and best practices',
-    completed: false
-  },
-  {
     title: 'Import History',
     description: 'Import historical transaction data (Optional)',
     completed: false,
     optional: true
+  },
+  {
+    title: 'Important Information',
+    description: 'Review consumption info defaults and best practices',
+    completed: false
   }
 ]
 
@@ -299,7 +299,7 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
       newSteps[4].completed = true
       setSteps(newSteps)
       
-      // Move to next step
+      // Move to next step (Import History)
       setCurrentStep(5)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save refund preference')
@@ -311,7 +311,7 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
   const handleCompleteSetup = () => {
     // Mark final step as completed
     const newSteps = [...steps]
-    newSteps[5].completed = true
+    newSteps[6].completed = true
     setSteps(newSteps)
     
     // Call completion callback
@@ -1004,117 +1004,7 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
           </div>
         )
 
-      case 5: // Important Information
-        return (
-          <div className="space-y-4">
-            <div className="bg-green-50 p-4 rounded-lg">
-              <h3 className="text-sm font-medium text-green-900 flex items-center">
-                <InformationCircleIcon className="h-5 w-5 mr-1" />
-                Important Information
-              </h3>
-              <p className="mt-1 text-sm text-green-700">
-                Review the following default behaviors and best practices for consumption information.
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <div className="bg-white border border-gray-200 rounded-lg p-4">
-                <h4 className="text-sm font-semibold text-gray-700">Delivery Status</h4>
-                <p className="mt-1 text-xs text-gray-600">
-                  <strong>Default:</strong> All consumption requests report delivery status as
-                  "Successfully delivered and working properly" (status: 0).
-                </p>
-                <p className="mt-1 text-xs text-orange-600">
-                  ⚠️ Ensure successful delivery of purchased items before consumption data is sent to Apple.
-                </p>
-              </div>
-
-              <div className="bg-white border border-gray-200 rounded-lg p-4">
-                <h4 className="text-sm font-semibold text-gray-700">Consumption Status</h4>
-                <p className="mt-1 text-xs text-gray-600">
-                  <strong>Default:</strong> Returns "Undeclared" (0) when consumption data cannot be determined.
-                </p>
-                <p className="mt-1 text-xs text-gray-600">
-                  <strong>Logic:</strong> Simplified implementation - returns 0 (undeclared), 1 (not consumed 
-                  for active subscriptions), or 2 (partially consumed if content accessed).
-                </p>
-                <p className="mt-1 text-xs text-orange-600">
-                  ⚠️ To track consumption accurately, implement usage tracking in your app and store in the 
-                  usage_metrics table.
-                </p>
-              </div>
-
-              <div className="bg-white border border-gray-200 rounded-lg p-4">
-                <h4 className="text-sm font-semibold text-gray-700">User Status</h4>
-                <p className="mt-1 text-xs text-gray-600">
-                  <strong>Default:</strong> Returns 0 (Undeclared).
-                </p>
-                <p className="mt-1 text-xs text-gray-600">
-                  <strong>Apple Values:</strong>
-                </p>
-                <ul className="mt-1 text-xs text-gray-600 list-disc list-inside">
-                  <li>0 = Undeclared</li>
-                  <li>1 = Active</li>
-                  <li>2 = Suspended</li>
-                  <li>3 = Terminated</li>
-                  <li>4 = Limited Access</li>
-                </ul>
-                <p className="mt-1 text-xs text-orange-600">
-                  ⚠️ Implement an account management system in your app to track suspended/terminated/limited 
-                  accounts.
-                </p>
-              </div>
-
-              <div className="bg-white border border-gray-200 rounded-lg p-4">
-                <h4 className="text-sm font-semibold text-gray-700">Customer Consent</h4>
-                <p className="mt-1 text-xs text-gray-600">
-                  <strong>Default:</strong> customerConsented is set to <strong>true</strong> for all consumption requests.
-                </p>
-                <p className="mt-1 text-xs text-orange-600">
-                  ⚠️ Important: You must obtain explicit consent from your users before sending their consumption data 
-                  to Apple. This is your responsibility as the developer to ensure compliance with privacy regulations.
-                </p>
-                <p className="mt-1 text-xs text-gray-600">
-                  Consider implementing:
-                </p>
-                <ul className="mt-1 text-xs text-gray-600 list-disc list-inside">
-                  <li>A consent dialog in your app</li>
-                  <li>Clear privacy policy explaining data usage</li>
-                  <li>User preference settings for data sharing</li>
-                </ul>
-              </div>
-            </div>
-
-            <div className="flex space-x-3">
-              <button
-                onClick={() => {
-                  setError('')
-                  setCurrentStep(4)
-                }}
-                className="flex-1 py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                <ArrowLeftIcon className="h-4 w-4 inline mr-1" />
-                Back
-              </button>
-              <button
-                onClick={() => setCurrentStep(6)}
-                className="flex-1 py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Import History
-                <ArrowRightIcon className="h-4 w-4 inline ml-1" />
-              </button>
-              <button
-                onClick={handleCompleteSetup}
-                className="flex-1 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-              >
-                Complete Setup
-                <CheckCircleIcon className="h-4 w-4 inline ml-1" />
-              </button>
-            </div>
-          </div>
-        )
-        
-      case 6: // Data Initialization (Optional)
+      case 5: // Import History (Optional)
         return (
           <div className="space-y-4">
             <div className="bg-blue-50 p-4 rounded-lg">
@@ -1247,7 +1137,7 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
 
             <div className="flex space-x-3">
               <button
-                onClick={() => setCurrentStep(5)}
+                onClick={() => setCurrentStep(4)}
                 className="flex-1 py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
                 <ArrowLeftIcon className="h-4 w-4 inline mr-1" />
@@ -1255,11 +1145,11 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
               </button>
               {(importProgress.sandbox === 'completed' || importProgress.production === 'completed') ? (
                 <button
-                  onClick={handleCompleteSetup}
-                  className="flex-1 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                  onClick={() => setCurrentStep(6)}
+                  className="flex-1 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                 >
-                  Import Complete - Continue
-                  <CheckCircleIcon className="h-4 w-4 inline ml-1" />
+                  Continue to Important Info
+                  <ArrowRightIcon className="h-4 w-4 inline ml-1" />
                 </button>
               ) : (
                 <button
@@ -1274,10 +1164,113 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
                 </button>
               )}
               <button
-                onClick={handleCompleteSetup}
+                onClick={() => setCurrentStep(6)}
                 className="flex-1 py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
               >
                 Skip for Now
+              </button>
+            </div>
+          </div>
+        )
+        
+      case 6: // Important Information
+        return (
+          <div className="space-y-4">
+            <div className="bg-green-50 p-4 rounded-lg">
+              <h3 className="text-sm font-medium text-green-900 flex items-center">
+                <InformationCircleIcon className="h-5 w-5 mr-1" />
+                Important Information
+              </h3>
+              <p className="mt-1 text-sm text-green-700">
+                Review the following default behaviors and best practices for consumption information.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <h4 className="text-sm font-semibold text-gray-700">Delivery Status</h4>
+                <p className="mt-1 text-xs text-gray-600">
+                  <strong>Default:</strong> All consumption requests report delivery status as
+                  "Successfully delivered and working properly" (status: 0).
+                </p>
+                <p className="mt-1 text-xs text-orange-600">
+                  ⚠️ Ensure successful delivery of purchased items before consumption data is sent to Apple.
+                </p>
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <h4 className="text-sm font-semibold text-gray-700">Consumption Status</h4>
+                <p className="mt-1 text-xs text-gray-600">
+                  <strong>Default:</strong> Returns "Undeclared" (0) when consumption data cannot be determined.
+                </p>
+                <p className="mt-1 text-xs text-gray-600">
+                  <strong>Logic:</strong> Simplified implementation - returns 0 (undeclared), 1 (not consumed 
+                  for active subscriptions), or 2 (partially consumed if content accessed).
+                </p>
+                <p className="mt-1 text-xs text-orange-600">
+                  ⚠️ To track consumption accurately, implement usage tracking in your app and store in the 
+                  usage_metrics table.
+                </p>
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <h4 className="text-sm font-semibold text-gray-700">User Status</h4>
+                <p className="mt-1 text-xs text-gray-600">
+                  <strong>Default:</strong> Returns 0 (Undeclared).
+                </p>
+                <p className="mt-1 text-xs text-gray-600">
+                  <strong>Apple Values:</strong>
+                </p>
+                <ul className="mt-1 text-xs text-gray-600 list-disc list-inside">
+                  <li>0 = Undeclared</li>
+                  <li>1 = Active</li>
+                  <li>2 = Suspended</li>
+                  <li>3 = Terminated</li>
+                  <li>4 = Limited Access</li>
+                </ul>
+                <p className="mt-1 text-xs text-orange-600">
+                  ⚠️ Implement an account management system in your app to track suspended/terminated/limited 
+                  accounts.
+                </p>
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <h4 className="text-sm font-semibold text-gray-700">Customer Consent</h4>
+                <p className="mt-1 text-xs text-gray-600">
+                  <strong>Default:</strong> customerConsented is set to <strong>true</strong> for all consumption requests.
+                </p>
+                <p className="mt-1 text-xs text-orange-600">
+                  ⚠️ Important: You must obtain explicit consent from your users before sending their consumption data 
+                  to Apple. This is your responsibility as the developer to ensure compliance with privacy regulations.
+                </p>
+                <p className="mt-1 text-xs text-gray-600">
+                  Consider implementing:
+                </p>
+                <ul className="mt-1 text-xs text-gray-600 list-disc list-inside">
+                  <li>A consent dialog in your app</li>
+                  <li>Clear privacy policy explaining data usage</li>
+                  <li>User preference settings for data sharing</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="flex space-x-3">
+              <button
+                onClick={() => {
+                  setError('')
+                  setCurrentStep(5)
+                }}
+                className="flex-1 py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                <ArrowLeftIcon className="h-4 w-4 inline mr-1" />
+                Back
+              </button>
+              <button
+                onClick={handleCompleteSetup}
+                className="flex-1 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+              >
+                Complete Setup
+                <CheckCircleIcon className="h-4 w-4 inline ml-1" />
               </button>
             </div>
           </div>
