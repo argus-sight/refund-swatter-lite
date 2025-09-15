@@ -61,21 +61,10 @@ Refund Swatter Lite 实时处理 Apple 的 CONSUMPTION_REQUEST 通知，并立�
 
 ## 快速开始
 
-### 前置要求
-
-- Supabase 账户和项目
-- 具有 App Store Server API 访问权限的 Apple Developer 账户
-- Node.js 16+
-- Supabase CLI（[安装指南](https://supabase.com/docs/guides/cli)）
-
-### 安装
-
 1. **克隆并配置**
 ```bash
 git clone git@github.com:argus-sight/refund-swatter-lite.git
 cd refund-swatter-lite
-
-# 配置项目设置
 cp .env.project.example .env.project
 # 使用你的凭据编辑 .env.project
 ```
@@ -85,25 +74,16 @@ cp .env.project.example .env.project
 ./setup-simple.sh
 ```
 
-这将自动：
-- 链接你的 Supabase 项目
-- 应用数据库迁移
-- 部署 Edge Functions
-- 配置环境
-- 设置定时任务
-- 创建管理员用户
+3. **启动 Web 仪表板并配置 Apple 凭据**
+```bash
+cd web && npm install && npm run dev
+```
+然后访问 `http://localhost:3000` 配置 Apple 凭据
 
-3. **配置 Apple 凭据**
+4. **在 App Store Connect 中设置 webhook URL**：
+   `https://[your-project-ref].supabase.co/functions/v1/webhook`
 
-访问 `http://localhost:3000` 的 Web 仪表板并添加：
-- Bundle ID
-- Issuer ID（来自 App Store Connect）
-- Key ID（来自 App Store Connect）
-- In-App Purchase Key（.p8 文件内容）
-
-4. **在 App Store Connect 中设置 webhook**
-- Production URL：`https://your-project.supabase.co/functions/v1/webhook`
-- Sandbox URL：`https://your-project.supabase.co/functions/v1/webhook`
+详细安装说明请参见 [SETUP_GUIDE.md](./SETUP_GUIDE.md)。
 
 ## 项目结构
 
@@ -135,10 +115,6 @@ refund-swatter-lite/
 - 确保 Edge Functions 已部署
 - 确保为 webhook Edge Function 禁用了 JWT 验证
 
-**消费数据未发送**
-- 验证定时任务是否正在运行
-- 检查 config 表中的 Apple 凭据
-- 查看 `send_consumption_jobs` 表中的错误
 
 **测试通知失败**
 - 确保选择了正确的环境
