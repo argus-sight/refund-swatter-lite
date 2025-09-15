@@ -649,36 +649,87 @@ serve(async (req) => {
         const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
         const processUrl = `${supabaseUrl}/functions/v1/process-notifications`
         
-        // Fire and forget - don't wait for processing to complete
         // Process in batches of 50 to avoid timeout
         const batchSize = 50
         const batches = Math.ceil(notificationsToProcess / batchSize)
         
         console.log(`[${requestId}] Will process in ${batches} batch(es) of up to ${batchSize} notifications each`)
         
+        let totalProcessed = 0
+        let totalFailed = 0
+        const batchResults = []
+        
         for (let i = 0; i < batches; i++) {
-          fetch(processUrl, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${supabaseServiceKey}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              limit: batchSize
+          try {
+            console.log(`[${requestId}] Processing batch ${i + 1}/${batches}...`)
+            
+            // Wait for each batch to complete before processing the next one
+            const response = await fetch(processUrl, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${supabaseServiceKey}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                limit: batchSize
+              })
             })
-          }).then(() => {
-            console.log(`[${requestId}] Batch ${i + 1} processing triggered successfully`)
-          }).catch(error => {
-            console.error(`[${requestId}] Failed to trigger batch ${i + 1} processing:`, error)
-          })
-          
-          // Small delay between batches to avoid overwhelming the system
-          if (i < batches - 1) {
-            await new Promise(resolve => setTimeout(resolve, 100))
+            
+            if (response.ok) {
+              const result = await response.json()
+              totalProcessed += result.processed || 0
+              totalFailed += result.failed || 0
+              batchResults.push({
+                batch: i + 1,
+                processed: result.processed || 0,
+                failed: result.failed || 0,
+                total: result.total || 0
+              })
+              
+              console.log(`[${requestId}] ✓ Batch ${i + 1} completed: processed=${result.processed || 0}, failed=${result.failed || 0}`)
+              
+              // If no notifications were processed in this batch, stop processing
+              // This means we've processed all pending notifications
+              if (!result.total || result.total === 0) {
+                console.log(`[${requestId}] No more notifications to process, stopping early`)
+                break
+              }
+            } else {
+              const errorText = await response.text()
+              console.error(`[${requestId}] ✗ Batch ${i + 1} failed with status ${response.status}: ${errorText}`)
+              batchResults.push({
+                batch: i + 1,
+                error: `HTTP ${response.status}: ${errorText}`
+              })
+            }
+            
+            // Delay between batches to avoid overwhelming the system
+            // Longer delay for larger batches or if previous batch had failures
+            if (i < batches - 1) {
+              const delayMs = totalFailed > 0 ? 2000 : 500  // 2s delay if there were failures, 500ms otherwise
+              console.log(`[${requestId}] Waiting ${delayMs}ms before next batch...`)
+              await new Promise(resolve => setTimeout(resolve, delayMs))
+            }
+          } catch (error) {
+            console.error(`[${requestId}] ✗ Batch ${i + 1} encountered error:`, error)
+            batchResults.push({
+              batch: i + 1,
+              error: error instanceof Error ? error.message : String(error)
+            })
+            
+            // Continue with next batch even if one fails
+            if (i < batches - 1) {
+              console.log(`[${requestId}] Continuing with next batch despite error...`)
+              await new Promise(resolve => setTimeout(resolve, 2000))  // Wait 2s after error
+            }
           }
         }
         
-        console.log(`[${requestId}] ✓ All notification processing batches triggered`)
+        console.log(`[${requestId}] ============================================================`)
+        console.log(`[${requestId}] ✓ Notification processing completed`)
+        console.log(`[${requestId}] Total processed: ${totalProcessed}`)
+        console.log(`[${requestId}] Total failed: ${totalFailed}`)
+        console.log(`[${requestId}] Batch results:`, JSON.stringify(batchResults, null, 2))
         console.log(`[${requestId}] ============================================================`)
       } catch (error) {
         console.error(`[${requestId}] ⚠️ Warning: Failed to trigger notification processing:`, error)
@@ -720,15 +771,15 @@ serve(async (req) => {
     
     console.error(`[${requestId}] ************************************************************`)
     console.error(`[${requestId}] ==> Request Failed with Error`)
-    console.error(`[${requestId}] Error Type: ${error.name}`)
-    console.error(`[${requestId}] Error Message: ${error.message}`)
-    console.error(`[${requestId}] Stack Trace:`, error.stack)
+    console.error(`[${requestId}] Error Type: ${error instanceof Error ? error.name : 'Unknown'}`)
+    console.error(`[${requestId}] Error Message: ${error instanceof Error ? error.message : String(error)}`)
+    console.error(`[${requestId}] Stack Trace:`, error instanceof Error ? error.stack : 'N/A')
     console.error(`[${requestId}] Processing time before error: ${duration}ms`)
     console.error(`[${requestId}] ************************************************************`)
     
     return new Response(
       JSON.stringify({ 
-        error: error.message || 'Failed to initialize data',
+        error: error instanceof Error ? error.message : 'Failed to initialize data',
         requestId,
         processingTime: duration
       }),

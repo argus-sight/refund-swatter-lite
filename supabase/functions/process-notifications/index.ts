@@ -325,7 +325,8 @@ async function processConsumptionRequest(supabase: any, notification: any, trans
   // Calculate consumption data using the database function
   const { data: calculatedData, error: calcError } = await supabase
     .rpc('calculate_consumption_data', {
-      p_original_transaction_id: originalTransactionId
+      p_original_transaction_id: originalTransactionId,
+      p_environment: environment
     })
 
   if (calcError) {
