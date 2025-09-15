@@ -43,7 +43,7 @@ export default function ConsumptionMetrics({ stats, environment }: ConsumptionMe
     },
     {
       label: 'Avg Response Time',
-      value: stats.avg_response_time_ms ? `${stats.avg_response_time_ms}ms` : '-',
+      value: stats.avg_response_time_ms ? `${(stats.avg_response_time_ms / 1000).toFixed(2)}s` : '-',
       color: 'text-purple-600'
     }
   ]
