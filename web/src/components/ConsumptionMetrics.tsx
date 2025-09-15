@@ -80,28 +80,6 @@ export default function ConsumptionMetrics({ stats, environment }: ConsumptionMe
           </div>
         </div>
       </div>
-
-      {/* Important Notice about Consumption Data */}
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-        <h3 className="text-sm font-semibold text-amber-900 mb-2">⚠️ Important: Consumption Data Defaults</h3>
-        <div className="text-xs text-amber-800 space-y-1">
-          <p>
-            <strong>Consumption Status:</strong> Defaults to 0 (Undeclared) when usage data is not available. 
-            Apple notifications don't track content consumption - you need to implement this in your app.
-          </p>
-          <p>
-            <strong>User Status:</strong> Defaults to 0 (Undeclared) or 1 (Active). 
-            To report suspended/terminated accounts, implement account management in your app.
-          </p>
-          <p>
-            <strong>Delivery Status:</strong> Always reports 0 (Successfully delivered). 
-            Ensure successful delivery before sending consumption data.
-          </p>
-          <p className="pt-2 text-amber-900">
-            See Settings tab for detailed information about each field.
-          </p>
-        </div>
-      </div>
     </div>
   )
 }
