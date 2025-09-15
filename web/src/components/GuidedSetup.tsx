@@ -21,6 +21,7 @@ interface StepProps {
   title: string
   description: string
   completed: boolean
+  optional?: boolean
 }
 
 const STEPS: StepProps[] = [
@@ -53,6 +54,12 @@ const STEPS: StepProps[] = [
     title: 'Important Information',
     description: 'Review consumption info defaults and best practices',
     completed: false
+  },
+  {
+    title: 'Import History',
+    description: 'Import historical transaction data (Optional)',
+    completed: false,
+    optional: true
   }
 ]
 
@@ -84,6 +91,17 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
   const [testEnvironment, setTestEnvironment] = useState<AppleEnvironment>(AppleEnvironment.SANDBOX)
   const [testResult, setTestResult] = useState<any>(null)
   const [testLoading, setTestLoading] = useState(false)
+  
+  // Data initialization states
+  const [importLoading, setImportLoading] = useState(false)
+  const [importProgress, setImportProgress] = useState<{
+    sandbox: 'pending' | 'loading' | 'completed' | 'error'
+    production: 'pending' | 'loading' | 'completed' | 'error'
+  }>({ sandbox: 'pending', production: 'pending' })
+  const [importResults, setImportResults] = useState<{
+    sandbox?: any
+    production?: any
+  }>({})
   
   // Step 5: Refund Preference
   const [refundPreference, setRefundPreference] = useState(0)
@@ -300,6 +318,116 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
     if (onSetupComplete) {
       onSetupComplete()
     }
+  }
+
+  const handleImportHistoricalData = async () => {
+    setImportLoading(true)
+    setImportProgress({ sandbox: 'pending', production: 'pending' })
+    setImportResults({})
+    
+    // Helper function to get date range
+    const getDateRange = (days: number) => {
+      const endDate = new Date()
+      endDate.setUTCHours(23, 59, 59, 999)
+      const startDate = new Date(endDate.getTime() - (days * 24 * 60 * 60 * 1000 - 1))
+      return {
+        startDate: startDate.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0]
+      }
+    }
+    
+    // Check if we have config for production (it might not be set up yet)
+    const hasProductionConfig = config && config.apple_issuer_id && config.apple_key_id
+    
+    // Import Sandbox (30 days max)
+    const importSandbox = async () => {
+      setImportProgress(prev => ({ ...prev, sandbox: 'loading' }))
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) throw new Error('No session')
+        
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+        const response = await fetch(`${supabaseUrl}/functions/v1/data-initialization`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            environment: AppleEnvironment.SANDBOX,
+            ...getDateRange(30)
+          })
+        })
+        
+        const data = await response.json()
+        if (!response.ok) {
+          // Provide more specific error messages
+          let errorMessage = data.error || 'Sandbox import failed'
+          if (response.status === 404) {
+            errorMessage = 'Sandbox environment not configured or no data available'
+          } else if (response.status === 401) {
+            errorMessage = 'Authentication failed for Sandbox environment'
+          } else if (data.details) {
+            errorMessage = `${errorMessage}: ${JSON.stringify(data.details)}`
+          }
+          throw new Error(errorMessage)
+        }
+        
+        setImportResults(prev => ({ ...prev, sandbox: data }))
+        setImportProgress(prev => ({ ...prev, sandbox: 'completed' }))
+      } catch (error: any) {
+        console.error('Sandbox import error:', error)
+        setImportProgress(prev => ({ ...prev, sandbox: 'error' }))
+        setImportResults(prev => ({ ...prev, sandbox: { error: error.message || 'Unknown error' } }))
+      }
+    }
+    
+    // Import Production (180 days max)
+    const importProduction = async () => {
+      setImportProgress(prev => ({ ...prev, production: 'loading' }))
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) throw new Error('No session')
+        
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+        const response = await fetch(`${supabaseUrl}/functions/v1/data-initialization`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            environment: AppleEnvironment.PRODUCTION,
+            ...getDateRange(180)
+          })
+        })
+        
+        const data = await response.json()
+        if (!response.ok) {
+          // Provide more specific error messages
+          let errorMessage = data.error || 'Production import failed'
+          if (response.status === 404) {
+            errorMessage = 'Production environment not configured or no data available'
+          } else if (response.status === 401) {
+            errorMessage = 'Authentication failed for Production environment'
+          } else if (data.details) {
+            errorMessage = `${errorMessage}: ${JSON.stringify(data.details)}`
+          }
+          throw new Error(errorMessage)
+        }
+        
+        setImportResults(prev => ({ ...prev, production: data }))
+        setImportProgress(prev => ({ ...prev, production: 'completed' }))
+      } catch (error: any) {
+        console.error('Production import error:', error)
+        setImportProgress(prev => ({ ...prev, production: 'error' }))
+        setImportResults(prev => ({ ...prev, production: { error: error.message || 'Unknown error' } }))
+      }
+    }
+    
+    // Run both imports in parallel
+    await Promise.all([importSandbox(), importProduction()])
+    setImportLoading(false)
   }
 
   const copyWebhookUrl = () => {
@@ -876,7 +1004,7 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
           </div>
         )
 
-      case 5: // Consumption Info
+      case 5: // Important Information
         return (
           <div className="space-y-4">
             <div className="bg-green-50 p-4 rounded-lg">
@@ -969,11 +1097,187 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
                 Back
               </button>
               <button
+                onClick={() => setCurrentStep(6)}
+                className="flex-1 py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                Import History
+                <ArrowRightIcon className="h-4 w-4 inline ml-1" />
+              </button>
+              <button
                 onClick={handleCompleteSetup}
                 className="flex-1 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
               >
                 Complete Setup
                 <CheckCircleIcon className="h-4 w-4 inline ml-1" />
+              </button>
+            </div>
+          </div>
+        )
+        
+      case 6: // Data Initialization (Optional)
+        return (
+          <div className="space-y-4">
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <h3 className="text-sm font-medium text-blue-900">Import Historical Data (Optional)</h3>
+              <p className="mt-1 text-sm text-blue-700">
+                This one-time import will retrieve historical transaction data from both Sandbox (last 30 days) 
+                and Production (last 180 days) environments. Future data will sync automatically via webhooks.
+              </p>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <h4 className="text-sm font-medium text-gray-900 mb-3">Why import historical data?</h4>
+              <ul className="space-y-2 text-sm text-gray-600">
+                <li className="flex items-start">
+                  <svg className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  Access past refund and purchase patterns
+                </li>
+                <li className="flex items-start">
+                  <svg className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  Build complete transaction history for analytics
+                </li>
+                <li className="flex items-start">
+                  <svg className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  Identify historical trends and customer behavior
+                </li>
+              </ul>
+            </div>
+
+            {!importLoading && importProgress.sandbox === 'pending' && importProgress.production === 'pending' && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <div className="flex">
+                  <svg className="h-5 w-5 text-amber-400 mr-2 flex-shrink-0 mt-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                  </svg>
+                  <div className="text-sm text-amber-700">
+                    <strong>Note:</strong> This import may take 2-5 minutes per environment.
+                    You can skip this step and import data later from the Tools section.
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Import Progress */}
+            {(importLoading || importProgress.sandbox !== 'pending' || importProgress.production !== 'pending') && (
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-gray-900 mb-3">Import Progress</h4>
+                <div className="space-y-3">
+                  {/* Sandbox Environment */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm font-medium text-gray-700">Sandbox (30 days):</span>
+                      {importProgress.sandbox === 'loading' && (
+                        <svg className="animate-spin h-4 w-4 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      )}
+                    </div>
+                    <span className={`text-sm ${
+                      importProgress.sandbox === 'completed' ? 'text-green-600' :
+                      importProgress.sandbox === 'error' ? 'text-red-600' :
+                      importProgress.sandbox === 'loading' ? 'text-indigo-600' :
+                      'text-gray-400'
+                    }`}>
+                      {importProgress.sandbox === 'completed' ? '✓ Completed' :
+                       importProgress.sandbox === 'error' ? '✗ Failed' :
+                       importProgress.sandbox === 'loading' ? 'Importing...' :
+                       'Pending'}
+                    </span>
+                  </div>
+                  
+                  {/* Production Environment */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm font-medium text-gray-700">Production (180 days):</span>
+                      {importProgress.production === 'loading' && (
+                        <svg className="animate-spin h-4 w-4 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      )}
+                    </div>
+                    <span className={`text-sm ${
+                      importProgress.production === 'completed' ? 'text-green-600' :
+                      importProgress.production === 'error' ? 'text-red-600' :
+                      importProgress.production === 'loading' ? 'text-indigo-600' :
+                      'text-gray-400'
+                    }`}>
+                      {importProgress.production === 'completed' ? '✓ Completed' :
+                       importProgress.production === 'error' ? '✗ Failed' :
+                       importProgress.production === 'loading' ? 'Importing...' :
+                       'Pending'}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Show results summary or errors */}
+                {(importResults.sandbox || importResults.production) && (
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    {importResults.sandbox?.summary && (
+                      <p className="text-xs text-gray-600">
+                        Sandbox: {importResults.sandbox.summary.totalFetched || 0} fetched, {importResults.sandbox.summary.inserted || 0} new imported
+                      </p>
+                    )}
+                    {importResults.sandbox?.error && (
+                      <p className="text-xs text-red-600">
+                        Sandbox Error: {importResults.sandbox.error}
+                      </p>
+                    )}
+                    {importResults.production?.summary && (
+                      <p className="text-xs text-gray-600 mt-1">
+                        Production: {importResults.production.summary.totalFetched || 0} fetched, {importResults.production.summary.inserted || 0} new imported
+                      </p>
+                    )}
+                    {importResults.production?.error && (
+                      <p className="text-xs text-red-600 mt-1">
+                        Production Error: {importResults.production.error}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setCurrentStep(5)}
+                className="flex-1 py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                <ArrowLeftIcon className="h-4 w-4 inline mr-1" />
+                Back
+              </button>
+              {(importProgress.sandbox === 'completed' || importProgress.production === 'completed') ? (
+                <button
+                  onClick={handleCompleteSetup}
+                  className="flex-1 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                >
+                  Import Complete - Continue
+                  <CheckCircleIcon className="h-4 w-4 inline ml-1" />
+                </button>
+              ) : (
+                <button
+                  onClick={handleImportHistoricalData}
+                  disabled={importLoading}
+                  className="flex-1 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {importLoading ? 'Importing...' : 'Import Now'}
+                  {!importLoading && (
+                    <ArrowRightIcon className="h-4 w-4 inline ml-1" />
+                  )}
+                </button>
+              )}
+              <button
+                onClick={handleCompleteSetup}
+                className="flex-1 py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+              >
+                Skip for Now
               </button>
             </div>
           </div>
@@ -1023,6 +1327,7 @@ export default function GuidedSetup({ onSetupComplete }: GuidedSetupProps) {
                       index <= currentStep ? 'text-indigo-600' : 'text-gray-500'
                     }`}>
                       {step.title}
+                      {step.optional && <span className="text-gray-400 ml-1">(Optional)</span>}
                     </span>
                   </div>
                 </li>

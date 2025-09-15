@@ -73,79 +73,118 @@ async function storeNotifications(
   for (let i = 0; i < notifications.length; i += DB_BATCH_SIZE) {
     const batch = notifications.slice(i, i + DB_BATCH_SIZE)
     
-    // Prepare notifications for insertion into notifications_raw table
-    const notificationsToInsert = batch.map((notification: any) => {
-      // Decode signedTransactionInfo if present
-      let decodedTransactionInfo = null
-      let modifiedData = notification.data
-      
-      if (notification.data?.signedTransactionInfo) {
-        decodedTransactionInfo = decodeJWT(notification.data.signedTransactionInfo)
-        if (decodedTransactionInfo) {
-          // Replace the JWT string with the decoded object in the data
-          modifiedData = {
-            ...notification.data,
-            signedTransactionInfo: decodedTransactionInfo
-          }
-        }
-      }
-      
-      // Also decode signedRenewalInfo if present
-      if (notification.data?.signedRenewalInfo) {
-        const decodedRenewalInfo = decodeJWT(notification.data.signedRenewalInfo)
-        if (decodedRenewalInfo) {
-          modifiedData = {
-            ...modifiedData,
-            signedRenewalInfo: decodedRenewalInfo
-          }
-        }
-      }
-      
-      return {
-        notification_uuid: notification.notificationUUID,
-        notification_type: notification.notificationType,
-        subtype: notification.subtype,
-        signed_payload: notification.signedPayload || '', // Store the original signed payload
-        decoded_payload: {
-          version: notification.version,
-          signedDate: notification.signedDate,
-          data: modifiedData, // Use modified data with decoded JWTs
-          summary: notification.summary,
-          externalPurchaseToken: notification.externalPurchaseToken,
-          appAppleId: notification.appAppleId,
-          bundleId: notification.bundleId,
-          bundleVersion: notification.bundleVersion,
-          status: notification.status
-        },
-        decoded_transaction_info: decodedTransactionInfo, // Store separately for easy access
-        environment: notification.data?.environment || normalizeEnvironment(environment),
-        status: NotificationStatus.PENDING, // Will be processed later
-        received_at: new Date().toISOString(),
-        source: NotificationSource.HISTORY_API, // Mark as coming from history API
-        signed_date: notification.signedDate ? new Date(notification.signedDate) : null
-      }
-    })
-
-    // Insert with upsert to handle duplicates
-    const { data, error } = await supabase
+    // First, check which notifications already exist
+    const uuids = batch.map(n => n.notificationUUID)
+    const { data: existingNotifications, error: checkError } = await supabase
       .from('notifications_raw')
-      .upsert(notificationsToInsert, {
-        onConflict: 'notification_uuid',
-        ignoreDuplicates: false
+      .select('notification_uuid, status')
+      .in('notification_uuid', uuids)
+    
+    if (checkError) {
+      console.error(`[${requestId}] Error checking existing notifications:`, checkError)
+    }
+    
+    const existingUuids = new Set((existingNotifications || []).map(n => n.notification_uuid))
+    const processedUuids = new Set(
+      (existingNotifications || [])
+        .filter(n => n.status !== NotificationStatus.PENDING)
+        .map(n => n.notification_uuid)
+    )
+    
+    // Only insert notifications that don't exist or are still pending
+    const notificationsToInsert = batch
+      .filter(notification => {
+        const uuid = notification.notificationUUID
+        // Skip if already processed (not pending)
+        if (processedUuids.has(uuid)) {
+          console.log(`[${requestId}] Skipping ${uuid} - already processed`)
+          return false
+        }
+        return true
       })
-      .select()
+      .map((notification: any) => {
+        // Decode signedTransactionInfo if present
+        let decodedTransactionInfo = null
+        let modifiedData = notification.data
+        
+        if (notification.data?.signedTransactionInfo) {
+          decodedTransactionInfo = decodeJWT(notification.data.signedTransactionInfo)
+          if (decodedTransactionInfo) {
+            // Replace the JWT string with the decoded object in the data
+            modifiedData = {
+              ...notification.data,
+              signedTransactionInfo: decodedTransactionInfo
+            }
+          }
+        }
+        
+        // Also decode signedRenewalInfo if present
+        if (notification.data?.signedRenewalInfo) {
+          const decodedRenewalInfo = decodeJWT(notification.data.signedRenewalInfo)
+          if (decodedRenewalInfo) {
+            modifiedData = {
+              ...modifiedData,
+              signedRenewalInfo: decodedRenewalInfo
+            }
+          }
+        }
+        
+        return {
+          notification_uuid: notification.notificationUUID,
+          notification_type: notification.notificationType,
+          subtype: notification.subtype,
+          signed_payload: notification.signedPayload || '', // Store the original signed payload
+          decoded_payload: {
+            version: notification.version,
+            signedDate: notification.signedDate,
+            data: modifiedData, // Use modified data with decoded JWTs
+            summary: notification.summary,
+            externalPurchaseToken: notification.externalPurchaseToken,
+            appAppleId: notification.appAppleId,
+            bundleId: notification.bundleId,
+            bundleVersion: notification.bundleVersion,
+            status: notification.status
+          },
+          decoded_transaction_info: decodedTransactionInfo, // Store separately for easy access
+          environment: notification.data?.environment || normalizeEnvironment(environment),
+          status: NotificationStatus.PENDING, // Will be processed later
+          received_at: new Date().toISOString(),
+          source: NotificationSource.HISTORY_API, // Mark as coming from history API
+          signed_date: notification.signedDate ? new Date(notification.signedDate) : null
+        }
+      })
 
-    if (error) {
-      console.error(`[${requestId}] Batch insert error (${i}-${i + batch.length}):`, error)
-      errors.push({ 
-        pageNumber,
-        batch: `${i}-${i + batch.length}`, 
-        error: error.message 
-      })
+    if (notificationsToInsert.length > 0) {
+      // Check how many are actually new vs existing pending
+      const newNotificationUuids = notificationsToInsert
+        .map(n => n.notification_uuid)
+        .filter(uuid => !existingUuids.has(uuid))
+      
+      // Use ignoreDuplicates: true to preserve existing records
+      const { data, error } = await supabase
+        .from('notifications_raw')
+        .upsert(notificationsToInsert, {
+          onConflict: 'notification_uuid',
+          ignoreDuplicates: true  // Don't overwrite existing records
+        })
+        .select()
+
+      if (error) {
+        console.error(`[${requestId}] Batch insert error (${i}-${i + batch.length}):`, error)
+        errors.push({ 
+          pageNumber,
+          batch: `${i}-${i + batch.length}`, 
+          error: error.message 
+        })
+      } else {
+        // Count actual new insertions (ignoreDuplicates means existing records won't be in data)
+        const insertedCount = newNotificationUuids.length
+        inserted += insertedCount
+        const skipped = batch.length - notificationsToInsert.length
+        console.log(`[${requestId}] ✓ Batch ${i}-${i + batch.length}: ${insertedCount} new, ${notificationsToInsert.length - insertedCount} already pending, ${skipped} skipped (already processed)`)
+      }
     } else {
-      const insertedCount = data?.length || 0
-      inserted += insertedCount
-      console.log(`[${requestId}] ✓ Batch ${i}-${i + batch.length} stored: ${insertedCount} notifications`)
+      console.log(`[${requestId}] ✓ Batch ${i}-${i + batch.length}: All ${batch.length} notifications already processed, skipping`)
     }
   }
   
@@ -592,10 +631,18 @@ serve(async (req) => {
       requestId
     )
 
-    // Trigger processing of the imported notifications
-    if (result.totalInserted > 0) {
+    // Check if there are any pending notifications that need processing
+    const { count: pendingCount } = await supabase
+      .from('notifications_raw')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending')
+      .eq('environment', environment)
+    
+    // Trigger processing if we have new insertions OR existing pending notifications
+    if (result.totalInserted > 0 || (pendingCount && pendingCount > 0)) {
+      const notificationsToProcess = result.totalInserted > 0 ? result.totalInserted : pendingCount
       console.log(`[${requestId}] ============================================================`)
-      console.log(`[${requestId}] Triggering notification processing for ${result.totalInserted} notifications...`)
+      console.log(`[${requestId}] Triggering notification processing for ${notificationsToProcess} notifications (${result.totalInserted} new, ${pendingCount || 0} total pending)...`)
       
       try {
         const supabaseUrl = Deno.env.get('SUPABASE_URL')!
@@ -605,7 +652,7 @@ serve(async (req) => {
         // Fire and forget - don't wait for processing to complete
         // Process in batches of 50 to avoid timeout
         const batchSize = 50
-        const batches = Math.ceil(result.totalInserted / batchSize)
+        const batches = Math.ceil(notificationsToProcess / batchSize)
         
         console.log(`[${requestId}] Will process in ${batches} batch(es) of up to ${batchSize} notifications each`)
         

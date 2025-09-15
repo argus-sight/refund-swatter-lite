@@ -19,10 +19,18 @@ interface ToolsProps {
   environment: AppleEnvironment
 }
 
+interface Tool {
+  id: string
+  name: string
+  icon: React.ComponentType<{ className?: string }>
+  description: string
+  isOneTime?: boolean
+}
+
 export default function Tools({ environment }: ToolsProps) {
   const [activeTool, setActiveTool] = useState('notification-history')
 
-  const tools = [
+  const tools: Tool[] = [
     { 
       id: 'notification-history', 
       name: 'Notification History', 
@@ -51,7 +59,8 @@ export default function Tools({ environment }: ToolsProps) {
       id: 'data-initialization', 
       name: 'Data Initialization', 
       icon: CircleStackIcon,
-      description: 'Import historical data from Apple'
+      description: 'Import historical data from Apple (One-time setup)',
+      isOneTime: true
     }
   ]
 
@@ -84,20 +93,27 @@ export default function Tools({ environment }: ToolsProps) {
             key={tool.id}
             onClick={() => setActiveTool(tool.id)}
             className={`
-              p-4 rounded-lg border-2 transition-all text-left
+              p-4 rounded-lg border-2 transition-all text-left relative
               ${activeTool === tool.id
                 ? 'border-indigo-500 bg-indigo-50'
-                : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
+                : tool.isOneTime 
+                  ? 'border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-gray-100'
+                  : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
               }
             `}
           >
+            {tool.isOneTime && (
+              <span className="absolute top-2 right-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                One-time
+              </span>
+            )}
             <div className="flex items-start space-x-3">
               <tool.icon className={`h-6 w-6 mt-0.5 ${
-                activeTool === tool.id ? 'text-indigo-600' : 'text-gray-400'
+                activeTool === tool.id ? 'text-indigo-600' : tool.isOneTime ? 'text-gray-400' : 'text-gray-400'
               }`} />
               <div className="flex-1">
                 <h3 className={`font-medium ${
-                  activeTool === tool.id ? 'text-indigo-900' : 'text-gray-900'
+                  activeTool === tool.id ? 'text-indigo-900' : tool.isOneTime ? 'text-gray-700' : 'text-gray-900'
                 }`}>
                   {tool.name}
                 </h3>
