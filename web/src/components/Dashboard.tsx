@@ -72,7 +72,7 @@ export default function Dashboard() {
       
       // Check if there's any historical notification data
       const { data, error } = await supabase
-        .from('apple_notifications')
+        .from('notifications_raw')
         .select('id')
         .limit(1)
       
