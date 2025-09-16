@@ -18,10 +18,7 @@
   <a href="https://github.com/argus-sight/refund-swatter-lite/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/argus-sight/refund-swatter-lite?style=social"></a>
   <a href="./README_zh.md"><img alt="中文" src="https://img.shields.io/badge/简体中文-README-blue"></a>
   <a href="#security"><img alt="You own your keys" src="https://img.shields.io/badge/You%20own%20your%20keys-BYOK-8b5cf6"></a>
-</p>
-
-<p align="center">
-  <a href="https://www.producthunt.com/products/refund-swatter-lite?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-refund&#0045;swatter&#0045;lite" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1015309&theme=light&t=1757955852137" alt="Refund&#0032;Swatter&#0032;Lite - Stop&#0032;iOS&#0032;refund&#0032;abuse&#0032;—&#0032;an&#0032;open&#0045;source&#0032;developer&#0032;tool | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" /></a>
+  <a href="https://www.producthunt.com/posts/refund-swatter-lite" target="_blank"><img src="https://img.shields.io/badge/Product%20Hunt-Launch-ff6154?style=flat-square&logo=producthunt&logoColor=white" alt="Product Hunt" /></a>
 </p>
 
 <p align="center">
