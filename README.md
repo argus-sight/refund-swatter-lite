@@ -135,13 +135,21 @@ refund-swatter-lite/
 - CRON_SECRET protects scheduled endpoints
 - No third‑party key upload — In-App Purchase Keys remain in your Supabase project only
 
-## License
-
-Licensed under the Apache License 2.0. See [LICENSE](./LICENSE) for details.
-
 ## Support
 
 For issues or questions, please open an issue on GitHub.
+
+## 🤝 Contributors
+
+<a href="https://github.com/Yvent">
+  <img src="https://avatars.githubusercontent.com/Yvent" width="50" style="border-radius:50%;" />
+</a>
+
+Thanks to our partners for their valuable suggestions and assistance.
+
+## License
+
+Licensed under the Apache License 2.0. See [LICENSE](./LICENSE) for details.
 
 ## Future Plans
 
