@@ -26,23 +26,23 @@ enable_confirmations = false
 verify_jwt = false
 
 [functions.send-consumption]
-verify_jwt = false
+verify_jwt = true
 
 [functions.apple-jwt]
-verify_jwt = false
+verify_jwt = true
 
 [functions.data-initialization]
-verify_jwt = false
+verify_jwt = true
 
 [functions.process-jobs]
-verify_jwt = false
+verify_jwt = true
 
 [functions.apple-notification-history]
-verify_jwt = false
+verify_jwt = true
 
 [functions.process-notifications]
-verify_jwt = false
+verify_jwt = true
 import_map = "./functions/import_map.json"
 
 [functions.process-notifications-cron]
-verify_jwt = false
+verify_jwt = true

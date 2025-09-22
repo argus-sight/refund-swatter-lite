@@ -261,6 +261,7 @@ ALTER FUNCTION "public"."handle_updated_at"() OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."process_pending_notifications_direct"() RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
     AS $$
 BEGIN
     -- Process all pending notifications
@@ -1061,7 +1062,6 @@ ALTER TABLE "public"."usage_metrics" ENABLE ROW LEVEL SECURITY;
 
 
 GRANT USAGE ON SCHEMA "public" TO "postgres";
-GRANT USAGE ON SCHEMA "public" TO "anon";
 GRANT USAGE ON SCHEMA "public" TO "authenticated";
 GRANT USAGE ON SCHEMA "public" TO "service_role";
 
@@ -1070,49 +1070,39 @@ GRANT USAGE ON SCHEMA "public" TO "service_role";
 -- GRANT statements for calculate_consumption_data removed - function moved to Edge Function
 
 
-GRANT ALL ON FUNCTION "public"."cleanup_old_data"("p_days_to_keep" integer) TO "anon";
-GRANT ALL ON FUNCTION "public"."cleanup_old_data"("p_days_to_keep" integer) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."cleanup_old_data"("p_days_to_keep" integer) TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."decode_jwt_payload"("jwt_token" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."decode_jwt_payload"("jwt_token" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."decode_jwt_payload"("jwt_token" "text") TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."get_apple_private_key"() TO "anon";
-GRANT ALL ON FUNCTION "public"."get_apple_private_key"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_apple_private_key"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."get_consumption_metrics_summary"("p_environment" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."get_consumption_metrics_summary"("p_environment" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_consumption_metrics_summary"("p_environment" "text") TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."get_lifetime_dollars_enum"("amount_in_cents" integer) TO "anon";
 GRANT ALL ON FUNCTION "public"."get_lifetime_dollars_enum"("amount_in_cents" integer) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_lifetime_dollars_enum"("amount_in_cents" integer) TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."get_lifetime_dollars_enum"("amount" numeric) TO "anon";
 GRANT ALL ON FUNCTION "public"."get_lifetime_dollars_enum"("amount" numeric) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_lifetime_dollars_enum"("amount" numeric) TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."get_playtime_enum"("minutes" integer) TO "anon";
 GRANT ALL ON FUNCTION "public"."get_playtime_enum"("minutes" integer) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_playtime_enum"("minutes" integer) TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."handle_updated_at"() TO "anon";
 GRANT ALL ON FUNCTION "public"."handle_updated_at"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."handle_updated_at"() TO "service_role";
 
@@ -1121,135 +1111,92 @@ GRANT ALL ON FUNCTION "public"."handle_updated_at"() TO "service_role";
 -- GRANT statements for process_consumption_request removed - function moved to Edge Function
 
 
-GRANT ALL ON FUNCTION "public"."process_pending_notifications_direct"() TO "anon";
-GRANT ALL ON FUNCTION "public"."process_pending_notifications_direct"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."process_pending_notifications_direct"() TO "service_role";
 
-
-
-GRANT ALL ON FUNCTION "public"."store_apple_private_key"("p_private_key" "text") TO "anon";
-GRANT ALL ON FUNCTION "public"."store_apple_private_key"("p_private_key" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."store_apple_private_key"("p_private_key" "text") TO "service_role";
 
-
-
-GRANT ALL ON FUNCTION "public"."update_updated_at_column"() TO "anon";
 GRANT ALL ON FUNCTION "public"."update_updated_at_column"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."update_updated_at_column"() TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."admin_users" TO "anon";
 GRANT ALL ON TABLE "public"."admin_users" TO "authenticated";
 GRANT ALL ON TABLE "public"."admin_users" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."apple_api_logs" TO "anon";
 GRANT ALL ON TABLE "public"."apple_api_logs" TO "authenticated";
 GRANT ALL ON TABLE "public"."apple_api_logs" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."config" TO "anon";
 GRANT ALL ON TABLE "public"."config" TO "authenticated";
 GRANT ALL ON TABLE "public"."config" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."consumption_request_webhooks" TO "anon";
 GRANT ALL ON TABLE "public"."consumption_request_webhooks" TO "authenticated";
 GRANT ALL ON TABLE "public"."consumption_request_webhooks" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."consumption_requests" TO "anon";
 GRANT ALL ON TABLE "public"."consumption_requests" TO "authenticated";
 GRANT ALL ON TABLE "public"."consumption_requests" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."send_consumption_jobs" TO "anon";
 GRANT ALL ON TABLE "public"."send_consumption_jobs" TO "authenticated";
 GRANT ALL ON TABLE "public"."send_consumption_jobs" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."transactions" TO "anon";
 GRANT ALL ON TABLE "public"."transactions" TO "authenticated";
 GRANT ALL ON TABLE "public"."transactions" TO "service_role";
 
 
-
-GRANT ALL ON TABLE "public"."consumption_request_details" TO "anon";
 GRANT ALL ON TABLE "public"."consumption_request_details" TO "authenticated";
 GRANT ALL ON TABLE "public"."consumption_request_details" TO "service_role";
 
 
-
-GRANT ALL ON TABLE "public"."cron_job_monitor" TO "anon";
 GRANT ALL ON TABLE "public"."cron_job_monitor" TO "authenticated";
 GRANT ALL ON TABLE "public"."cron_job_monitor" TO "service_role";
 
 
-
-GRANT ALL ON TABLE "public"."cron_job_status" TO "anon";
 GRANT ALL ON TABLE "public"."cron_job_status" TO "authenticated";
 GRANT ALL ON TABLE "public"."cron_job_status" TO "service_role";
 
 
-
-GRANT ALL ON TABLE "public"."notifications_raw" TO "anon";
 GRANT ALL ON TABLE "public"."notifications_raw" TO "authenticated";
 GRANT ALL ON TABLE "public"."notifications_raw" TO "service_role";
 
 
-
-GRANT ALL ON TABLE "public"."recent_cron_runs" TO "anon";
 GRANT ALL ON TABLE "public"."recent_cron_runs" TO "authenticated";
 GRANT ALL ON TABLE "public"."recent_cron_runs" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."refunds" TO "anon";
 GRANT ALL ON TABLE "public"."refunds" TO "authenticated";
 GRANT ALL ON TABLE "public"."refunds" TO "service_role";
 
 
-
-GRANT ALL ON TABLE "public"."usage_metrics" TO "anon";
 GRANT ALL ON TABLE "public"."usage_metrics" TO "authenticated";
 GRANT ALL ON TABLE "public"."usage_metrics" TO "service_role";
 
 
 
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "postgres";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "service_role";
 
 
-
-
-
-
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "postgres";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "service_role";
 
 
-
-
-
-
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "postgres";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "service_role";
-
-
-
 
 
 
