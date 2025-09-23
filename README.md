@@ -86,6 +86,15 @@ Then access `http://localhost:3000` to configure Apple credentials
 
 For detailed setup instructions, see [SETUP_GUIDE.md](./SETUP_GUIDE.md).
 
+## Developer Setup
+
+Local development relies on Git hooks that run [`gitleaks`](https://github.com/gitleaks/gitleaks) before every commit. After cloning the repo on a new machine, make sure to:
+
+1. Install Node dependencies and Husky: `npm install && npx husky install`.
+2. Install `gitleaks` so the pre-commit hook can run. For example, `brew install gitleaks` on macOS, or download the latest release from the GitHub project and place the binary in your `PATH`.
+
+Once set up, commits will automatically scan staged files for potential secrets.
+
 ## Project Structure
 
 ```
