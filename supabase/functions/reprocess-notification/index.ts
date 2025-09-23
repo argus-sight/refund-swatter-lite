@@ -15,7 +15,7 @@ serve(async (req) => {
     // Verify authentication
     const auth = await verifyAuth(req, {
       allowServiceRole: false,
-      requireAdmin: false  // Set to true if only admins should reprocess notifications
+      requireAdmin: true  // Set to true if only admins should reprocess notifications
     })
 
     if (!auth.isValid) {

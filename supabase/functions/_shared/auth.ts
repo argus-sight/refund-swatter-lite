@@ -29,26 +29,50 @@ export async function verifyAuth(
   req: Request,
   options: AuthOptions = {}
 ): Promise<AuthResult> {
+  // Normalise the caller's requirements so every branch can rely on defaults
+  /*
+   * Option semantics:
+   * - allowServiceRole:
+   *     Enables short-circuiting when the caller presents the Supabase
+   *     `service_role` key. Typical use cases are cron jobs or other backend
+   *     workers that invoke internal functions such as
+   *     `process-notifications` → `send-consumption`. Because the service role
+   *     key grants unrestricted database access, only enable this when you
+   *     explicitly expect service-role traffic; otherwise leaving it false
+   *     keeps the surface smaller.
+   * - requireAdmin:
+   *     Defaults to true, meaning the caller must exist in the `admin_users`
+   *     allowlist. Keep this enabled for any function that reads or mutates
+   *     privileged data (configuration, Apple credentials, etc.). Switch it to
+   *     false only for endpoints intentionally usable by any signed-in user and
+   *     that have no sensitive side effects.
+   * - allowAnonymous:
+   *     Reserved for public endpoints that deliberately accept unauthenticated
+   *     requests (default false). Examples include health checks or webhook
+   *     challenge handlers. Once enabled, missing Authorization headers are
+   *     treated as valid, so ensure the function does not expose confidential
+   *     data or actions.
+   */
   const {
     allowServiceRole = false,
     requireAdmin = true,
     allowAnonymous = false
   } = options
 
-  // Get the authorization header
+  // Extract the caller supplied bearer token (if any)
   const authHeader = req.headers.get('Authorization')
   
-  // Get environment variables
+  // Pull connection details once so we can create clients on demand
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
 
-  // Check if anonymous access is allowed
+  // Optional unauthenticated access for endpoints that explicitly declare it
   if (allowAnonymous && !authHeader) {
     return { isValid: true }
   }
 
-  // No auth header and anonymous not allowed
+  // Reject immediately when the header is missing or malformed
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return {
       isValid: false,
@@ -61,7 +85,7 @@ export async function verifyAuth(
 
   const token = authHeader.replace('Bearer ', '')
 
-  // Check if this is a service role token
+  // Allow privileged service role calls to short‑circuit when explicitly permitted
   if (allowServiceRole && token === supabaseServiceKey) {
     return {
       isValid: true,
@@ -69,7 +93,9 @@ export async function verifyAuth(
     }
   }
 
-  // Verify user JWT token
+  // For end-user sessions: validate the short-lived JWT with Supabase Auth
+  // supabase.auth.getUser(token) will call the Auth API, which verifies
+  // signature, expiry, and revocation before returning user metadata.
   try {
     const supabase = createClient(supabaseUrl, supabaseAnonKey)
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
@@ -84,7 +110,8 @@ export async function verifyAuth(
       }
     }
 
-    // If admin is required, check admin status
+    // Optionally confirm the caller is listed in admin_users when elevated
+    // privileges are required.
     if (requireAdmin) {
       // Use service role client to check admin status (bypasses RLS)
       const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)

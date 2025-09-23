@@ -344,7 +344,7 @@ serve(async (req) => {
 
   // Verify authentication - allow both service role and admin users
   const auth = await verifyAuth(req, {
-    allowServiceRole: true,
+    allowServiceRole: false,
     requireAdmin: true
   })
 

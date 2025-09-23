@@ -24,8 +24,8 @@ serve(async (req) => {
     requireAdmin: false  // Service role doesn't need admin check
   })
 
-  if (!auth.isValid) {
-    console.log(`[${requestId}] Authentication failed`)
+  if (!auth.isValid || !auth.isServiceRole) {
+    console.log(`[${requestId}] Authentication failed, Service role only`)
     return auth.errorResponse!
   }
 

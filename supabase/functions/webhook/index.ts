@@ -10,8 +10,6 @@ const corsHeaders = {
 
 async function verifyAppleJWS(signedPayload: string): Promise<any> {
   try {
-    console.log('Verifying Apple JWS signature...')
-    
     const parts = signedPayload.split('.')
     if (parts.length !== 3) {
       throw new Error(`Invalid JWT format: expected 3 parts, got ${parts.length}`)
@@ -33,7 +31,6 @@ async function verifyAppleJWS(signedPayload: string): Promise<any> {
       clockTolerance: 60
     })
     
-    console.log('Apple JWS signature verified successfully')
     return payload
   } catch (error) {
     console.error('Apple JWS verification failed:', error)
@@ -69,18 +66,8 @@ serve(async (req) => {
                    req.headers.get('cf-connecting-ip') || // Cloudflare
                    'unknown'
   
-  // Get all headers for logging
-  const allHeaders = Object.fromEntries(req.headers.entries())
-  
-  console.log(`[${requestId}] ==> Webhook Request Started`)
-  console.log(`[${requestId}] Method: ${req.method}`)
-  console.log(`[${requestId}] URL: ${req.url}`)
-  console.log(`[${requestId}] Source IP: ${sourceIP}`)
-  console.log(`[${requestId}] All Headers:`, allHeaders)
-  
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    console.log(`[${requestId}] CORS preflight request handled`)
     return new Response('ok', { headers: corsHeaders })
   }
 
@@ -88,25 +75,12 @@ serve(async (req) => {
   let body: any = null
   
   try {
-    // Get raw body first for logging purposes
+    // Get raw body for persistence and validation
     rawBody = await req.text()
-    console.log(`[${requestId}] Raw request body received, length: ${rawBody.length} bytes`)
-    
-    // Log the complete raw POST body
-    console.log(`[${requestId}] Raw POST body:`, rawBody)
     
     // Parse request body
-    console.log(`[${requestId}] Parsing request body...`)
     body = JSON.parse(rawBody)
     const { signedPayload } = body
-    
-    console.log(`[${requestId}] Request body parsed successfully`)
-    console.log(`[${requestId}] Body keys:`, Object.keys(body))
-    
-    // Log the parsed POST body
-    console.log(`[${requestId}] Parsed POST body:`, JSON.stringify(body, null, 2))
-
-    console.log(`[${requestId}] Apple Store Server Notification received`)
 
     if (!signedPayload) {
       console.error(`[${requestId}] ERROR: Missing signedPayload in request body`)
@@ -114,41 +88,25 @@ serve(async (req) => {
     }
 
     // Verify and decode the JWS
-    console.log(`[${requestId}] Starting JWS verification...`)
     const payload = await verifyAppleJWS(signedPayload)
-    console.log(`[${requestId}] JWS verified successfully`)
-    console.log(`[${requestId}] Notification type: ${payload.notificationType}`)
-    console.log(`[${requestId}] Subtype: ${payload.subtype || 'N/A'}`)
-    console.log(`[${requestId}] Notification UUID: ${payload.notificationUUID}`)
-    console.log(`[${requestId}] Environment: ${payload.data?.environment || 'Unknown'}`)
-    
+
     // Initialize Supabase client
-    console.log(`[${requestId}] Initializing Supabase client...`)
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    console.log(`[${requestId}] Supabase client initialized`)
 
     // Determine environment from payload and normalize it
     const environment = normalizeEnvironment(payload.data?.environment)
-    console.log(`[${requestId}] Environment determined: ${environment}`)
     
     // Decode signedTransactionInfo if present
     let decodedTransactionInfo = null
     if (payload.data?.signedTransactionInfo) {
-      console.log(`[${requestId}] Decoding signedTransactionInfo...`)
       decodedTransactionInfo = await decodeSignedTransactionInfo(payload.data.signedTransactionInfo)
-      if (decodedTransactionInfo) {
-        console.log(`[${requestId}] Transaction ID: ${decodedTransactionInfo.transactionId}`)
-        console.log(`[${requestId}] Original Transaction ID: ${decodedTransactionInfo.originalTransactionId || 'N/A'}`)
-        console.log(`[${requestId}] Product ID: ${decodedTransactionInfo.productId}`)
-      }
     }
     
     // Decode signedRenewalInfo if present
     let decodedRenewalInfo = null
     if (payload.data?.signedRenewalInfo) {
-      console.log(`[${requestId}] Decoding signedRenewalInfo...`)
       try {
         const parts = payload.data.signedRenewalInfo.split('.')
         if (parts.length === 3) {
@@ -174,7 +132,6 @@ serve(async (req) => {
     
     // If this is a CONSUMPTION_REQUEST, store it in the dedicated table
     if (payload.notificationType === 'CONSUMPTION_REQUEST') {
-      console.log(`[${requestId}] Detected CONSUMPTION_REQUEST, storing in consumption_request_webhooks table...`)
       
       // Extract consumption request specific data
       const consumptionRequestReason = payload.data?.consumptionRequestReason?.reason || null
@@ -207,13 +164,10 @@ serve(async (req) => {
       if (consumptionError) {
         console.error(`[${requestId}] ERROR storing consumption request webhook:`, consumptionError)
         // Don't throw here, continue with normal processing
-      } else {
-        console.log(`[${requestId}] ✓ Consumption request webhook stored with ID: ${consumptionWebhook.id}`)
       }
     }
     
     // Store raw notification with decoded transaction info
-    console.log(`[${requestId}] Storing raw notification in database...`)
     const { data: notification, error: notificationError } = await supabase
       .from('notifications_raw')
       .insert({
@@ -237,8 +191,6 @@ serve(async (req) => {
       throw notificationError
     }
 
-    console.log(`[${requestId}] ✓ Notification stored successfully`)
-    console.log(`[${requestId}] Notification ID: ${notification.id}`)
     
     // Update consumption request webhook with notification_raw_id if it was a CONSUMPTION_REQUEST
     if (payload.notificationType === 'CONSUMPTION_REQUEST') {
@@ -252,7 +204,6 @@ serve(async (req) => {
     }
 
     // Trigger asynchronous processing of the notification
-    console.log(`[${requestId}] Triggering notification processing...`)
     const processUrl = `${supabaseUrl}/functions/v1/process-notifications`
     
     // Fire and forget - don't wait for processing to complete
@@ -265,16 +216,11 @@ serve(async (req) => {
       body: JSON.stringify({
         limit: 10  // Process up to 10 pending notifications
       })
-    }).then(() => {
-      console.log(`[${requestId}] Notification processing triggered successfully`)
     }).catch(error => {
       console.error(`[${requestId}] Failed to trigger notification processing:`, error)
     })
 
     const duration = Date.now() - startTime
-    console.log(`[${requestId}] ==> Request completed successfully`)
-    console.log(`[${requestId}] Total processing time: ${duration}ms`)
-    console.log(`[${requestId}] Returning success response with notification ID: ${notification.id}`)
 
     return new Response(
       JSON.stringify({ success: true, id: notification.id, requestId, processingTime: duration }),
@@ -295,15 +241,8 @@ serve(async (req) => {
     // Log failed request details for debugging
     console.error(`[${requestId}] Failed request details:`)
     console.error(`[${requestId}] - Source IP: ${sourceIP}`)
-    console.error(`[${requestId}] - Headers:`, allHeaders)
     if (rawBody) {
-      // Truncate very long payloads for logging
-      const truncatedBody = rawBody.length > 5000 ? 
-        rawBody.substring(0, 5000) + '... [truncated]' : 
-        rawBody
-      console.error(`[${requestId}] - Raw body: ${truncatedBody}`)
-    } else {
-      console.error(`[${requestId}] - Raw body: [not captured]`)
+      console.error(`[${requestId}] - Raw body length: ${rawBody.length} bytes`)
     }
     
     return new Response(
