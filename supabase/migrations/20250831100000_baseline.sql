@@ -1,13 +1,14 @@
-
+-- =====================================
+-- Section: Extensions & Cron Schema ACL
+-- =====================================
 -- Enable required extensions first
 CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA extensions;
 CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
 CREATE EXTENSION IF NOT EXISTS supabase_vault WITH SCHEMA extensions;
 
--- Grant necessary permissions for pg_cron
-GRANT USAGE ON SCHEMA cron TO postgres;
-GRANT ALL ON ALL TABLES IN SCHEMA cron TO postgres;
-
+-- =====================================
+-- Section: Session Settings
+-- =====================================
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
@@ -19,16 +20,22 @@ SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
 
-
+-- =====================================
+-- Section: Schema Setup
+-- =====================================
 CREATE SCHEMA IF NOT EXISTS "public";
 
-
 ALTER SCHEMA "public" OWNER TO "pg_database_owner";
-
 
 COMMENT ON SCHEMA "public" IS 'standard public schema';
 
 
+-- =====================================
+-- Section: Functions (helpers, security-sensitive)
+-- =====================================
+-- NOTE:
+-- - SECURITY DEFINER functions include explicit search_path hardening.
+-- - Business logic moved to Edge Functions is documented inline for traceability.
 
 -- Function calculate_consumption_data removed - now implemented as Edge Function in _shared/consumption-calculator.ts
 
@@ -96,15 +103,16 @@ $$;
 ALTER FUNCTION "public"."decode_jwt_payload"("jwt_token" "text") OWNER TO "postgres";
 
 
+-- Gets In-App Purchase Key from vault (server-only)
 CREATE OR REPLACE FUNCTION "public"."get_apple_private_key"() RETURNS "text" -- Gets In-App Purchase Key from vault
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'vault'
+    SET search_path = ''
     AS $$
 DECLARE
     v_secret_id UUID;
     v_private_key TEXT;
 BEGIN
-    SELECT apple_private_key_id INTO v_secret_id FROM config WHERE id = 1;
+    SELECT apple_private_key_id INTO v_secret_id FROM public.config WHERE id = 1;
     
     IF v_secret_id IS NULL THEN
         RAISE EXCEPTION 'In-App Purchase Key not configured';
@@ -259,13 +267,14 @@ ALTER FUNCTION "public"."handle_updated_at"() OWNER TO "postgres";
 -- Function process_consumption_request removed - functionality handled by process-notifications Edge Function
 
 
+-- Fallback job to process pending notifications if Edge Function fails
 CREATE OR REPLACE FUNCTION "public"."process_pending_notifications_direct"() RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public'
+    SET search_path = ''
     AS $$
 BEGIN
     -- Process all pending notifications
-    UPDATE notifications_raw
+    UPDATE public.notifications_raw
     SET 
         status = 'processing',
         processed_at = NOW()
@@ -274,7 +283,7 @@ BEGIN
         AND received_at > NOW() - INTERVAL '24 hours';
         
     -- Log the processing attempt
-    INSERT INTO apple_api_logs (
+    INSERT INTO public.apple_api_logs (
         endpoint,
         method,
         request_body,
@@ -301,16 +310,17 @@ COMMENT ON FUNCTION "public"."process_pending_notifications_direct"() IS 'Backup
 
 
 
+-- Stores In-App Purchase Key in vault (server-only)
 CREATE OR REPLACE FUNCTION "public"."store_apple_private_key"("p_private_key" "text") RETURNS "uuid" -- Stores In-App Purchase Key in vault
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'vault'
+    SET search_path = ''
     AS $$
 DECLARE
     v_secret_id UUID;
     v_existing_id UUID;
 BEGIN
     -- Get existing secret ID if any
-    SELECT apple_private_key_id INTO v_existing_id FROM config WHERE id = 1;
+    SELECT apple_private_key_id INTO v_existing_id FROM public.config WHERE id = 1;
     
     -- If there's an existing secret, delete it first
     IF v_existing_id IS NOT NULL THEN
@@ -321,7 +331,7 @@ BEGIN
     v_secret_id := vault.create_secret(p_private_key, 'apple_private_key');
     
     -- Update config with the new secret ID
-    UPDATE config SET 
+    UPDATE public.config SET 
         apple_private_key_id = v_secret_id,
         updated_at = NOW()
     WHERE id = 1;
@@ -346,6 +356,9 @@ $$;
 
 ALTER FUNCTION "public"."update_updated_at_column"() OWNER TO "postgres";
 
+-- =====================================
+-- Section: Tables
+-- =====================================
 SET default_tablespace = '';
 
 SET default_table_access_method = "heap";
@@ -538,6 +551,9 @@ COMMENT ON COLUMN "public"."transactions"."environment" IS 'Apple environment (s
 
 
 
+-- =====================================
+-- Section: Views
+-- =====================================
 CREATE OR REPLACE VIEW "public"."consumption_request_details" WITH ("security_invoker"='on') AS
  SELECT DISTINCT ON ("cr"."id") "cr"."id" AS "request_id",
     "cr"."original_transaction_id",
@@ -747,6 +763,9 @@ CREATE TABLE IF NOT EXISTS "public"."usage_metrics" (
 ALTER TABLE "public"."usage_metrics" OWNER TO "postgres";
 
 
+-- =====================================
+-- Section: Constraints (PK/Unique)
+-- =====================================
 ALTER TABLE ONLY "public"."admin_users"
     ADD CONSTRAINT "admin_users_email_key" UNIQUE ("email");
 
@@ -827,6 +846,9 @@ ALTER TABLE ONLY "public"."usage_metrics"
 
 
 
+-- =====================================
+-- Section: Indexes
+-- =====================================
 CREATE INDEX "idx_consumption_jobs_scheduled" ON "public"."send_consumption_jobs" USING "btree" ("scheduled_at");
 
 
@@ -919,6 +941,9 @@ CREATE INDEX "idx_usage_metrics_token" ON "public"."usage_metrics" USING "btree"
 
 
 
+-- =====================================
+-- Section: Triggers
+-- =====================================
 CREATE OR REPLACE TRIGGER "set_admin_users_updated_at" BEFORE UPDATE ON "public"."admin_users" FOR EACH ROW EXECUTE FUNCTION "public"."handle_updated_at"();
 
 
@@ -927,6 +952,9 @@ CREATE OR REPLACE TRIGGER "update_consumption_request_webhooks_updated_at" BEFOR
 
 
 
+-- =====================================
+-- Section: Foreign Keys
+-- =====================================
 ALTER TABLE ONLY "public"."admin_users"
     ADD CONSTRAINT "admin_users_id_fkey" FOREIGN KEY ("id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
 
@@ -957,76 +985,92 @@ ALTER TABLE ONLY "public"."send_consumption_jobs"
 
 
 
+-- =====================================
+-- Section: RLS Policies & Enablement
+-- =====================================
+-- Policy: restrict config access to users listed in public.admin_users
 CREATE POLICY "Admin users can manage config" ON "public"."config" USING ((EXISTS ( SELECT 1
    FROM "public"."admin_users"
   WHERE ("admin_users"."id" = "auth"."uid"()))));
 
 
-
+-- Policy: let admin users schedule and update send_consumption_jobs
 CREATE POLICY "Admin users can manage consumption jobs" ON "public"."send_consumption_jobs" USING ((EXISTS ( SELECT 1
    FROM "public"."admin_users"
   WHERE ("admin_users"."id" = "auth"."uid"()))));
 
 
 
+-- Policy: admin users can review consumption_requests records
 CREATE POLICY "Admin users can manage consumption requests" ON "public"."consumption_requests" USING ((EXISTS ( SELECT 1
    FROM "public"."admin_users"
   WHERE ("admin_users"."id" = "auth"."uid"()))));
 
 
 
+-- Policy: admin users oversee inbound notifications_raw data
 CREATE POLICY "Admin users can manage raw notifications" ON "public"."notifications_raw" USING ((EXISTS ( SELECT 1
    FROM "public"."admin_users"
   WHERE ("admin_users"."id" = "auth"."uid"()))));
 
 
 
+-- Policy: admin users maintain refunds table
 CREATE POLICY "Admin users can manage refunds" ON "public"."refunds" USING ((EXISTS ( SELECT 1
    FROM "public"."admin_users"
   WHERE ("admin_users"."id" = "auth"."uid"()))));
 
 
 
+-- Policy: admin users manage transactions entries
 CREATE POLICY "Admin users can manage transactions" ON "public"."transactions" USING ((EXISTS ( SELECT 1
    FROM "public"."admin_users"
   WHERE ("admin_users"."id" = "auth"."uid"()))));
 
 
 
+-- Policy: admin users may read apple_api_logs
 CREATE POLICY "Admin users can view api logs" ON "public"."apple_api_logs" FOR SELECT USING ((EXISTS ( SELECT 1
    FROM "public"."admin_users"
   WHERE ("admin_users"."id" = "auth"."uid"()))));
 
 
 
+-- Policy: admin users may inspect consumption_request_webhooks
 CREATE POLICY "Admin users can view consumption webhooks" ON "public"."consumption_request_webhooks" FOR SELECT USING ((EXISTS ( SELECT 1
    FROM "public"."admin_users"
   WHERE ("admin_users"."id" = "auth"."uid"()))));
 
 
 
+-- Policy: admin users may read usage_metrics aggregates
 CREATE POLICY "Admin users can view usage metrics" ON "public"."usage_metrics" FOR SELECT USING ((EXISTS ( SELECT 1
    FROM "public"."admin_users"
   WHERE ("admin_users"."id" = "auth"."uid"()))));
 
 
 
+-- Policy: service_role may ingest notifications_raw rows
 CREATE POLICY "Service role can insert notifications" ON "public"."notifications_raw" FOR INSERT WITH CHECK ((("auth"."jwt"() ->> 'role'::"text") = 'service_role'::"text"));
 
 
 
+-- Policy: service_role may ingest consumption_request_webhooks
 CREATE POLICY "Service role can insert webhooks" ON "public"."consumption_request_webhooks" FOR INSERT WITH CHECK ((("auth"."jwt"() ->> 'role'::"text") = 'service_role'::"text"));
 
 
 
+-- Policy: service_role retains full control over admin_users table
 CREATE POLICY "Service role can manage admin users" ON "public"."admin_users" USING ((("auth"."jwt"() ->> 'role'::"text") = 'service_role'::"text"));
 
 
 
+-- Policy: service_role bypasses all RLS on config
 CREATE POLICY "Service role full access to config" ON "public"."config" USING ((("auth"."jwt"() ->> 'role'::"text") = 'service_role'::"text"));
 
 
 
+-- Policy: each user may read their own admin_users row
 CREATE POLICY "Users can view own admin profile" ON "public"."admin_users" FOR SELECT USING (("auth"."uid"() = "id"));
 
 
@@ -1061,7 +1105,9 @@ ALTER TABLE "public"."transactions" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."usage_metrics" ENABLE ROW LEVEL SECURITY;
 
 
-GRANT USAGE ON SCHEMA "public" TO "postgres";
+-- =====================================
+-- Section: Grants (Runtime Roles)
+-- =====================================
 GRANT USAGE ON SCHEMA "public" TO "authenticated";
 GRANT USAGE ON SCHEMA "public" TO "service_role";
 
@@ -1074,7 +1120,6 @@ GRANT ALL ON FUNCTION "public"."cleanup_old_data"("p_days_to_keep" integer) TO "
 
 
 
-GRANT ALL ON FUNCTION "public"."decode_jwt_payload"("jwt_token" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."decode_jwt_payload"("jwt_token" "text") TO "service_role";
 
 
@@ -1083,27 +1128,22 @@ GRANT ALL ON FUNCTION "public"."get_apple_private_key"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."get_consumption_metrics_summary"("p_environment" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_consumption_metrics_summary"("p_environment" "text") TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."get_lifetime_dollars_enum"("amount_in_cents" integer) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_lifetime_dollars_enum"("amount_in_cents" integer) TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."get_lifetime_dollars_enum"("amount" numeric) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_lifetime_dollars_enum"("amount" numeric) TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."get_playtime_enum"("minutes" integer) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_playtime_enum"("minutes" integer) TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."handle_updated_at"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."handle_updated_at"() TO "service_role";
 
 
@@ -1115,89 +1155,111 @@ GRANT ALL ON FUNCTION "public"."process_pending_notifications_direct"() TO "serv
 
 GRANT ALL ON FUNCTION "public"."store_apple_private_key"("p_private_key" "text") TO "service_role";
 
-GRANT ALL ON FUNCTION "public"."update_updated_at_column"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."update_updated_at_column"() TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."admin_users" TO "authenticated";
+GRANT SELECT ON TABLE "public"."admin_users" TO "authenticated";
 GRANT ALL ON TABLE "public"."admin_users" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."apple_api_logs" TO "authenticated";
+GRANT SELECT ON TABLE "public"."apple_api_logs" TO "authenticated";
 GRANT ALL ON TABLE "public"."apple_api_logs" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."config" TO "authenticated";
+GRANT SELECT, UPDATE ON TABLE "public"."config" TO "authenticated";
 GRANT ALL ON TABLE "public"."config" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."consumption_request_webhooks" TO "authenticated";
+GRANT SELECT ON TABLE "public"."consumption_request_webhooks" TO "authenticated";
 GRANT ALL ON TABLE "public"."consumption_request_webhooks" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."consumption_requests" TO "authenticated";
+GRANT SELECT ON TABLE "public"."consumption_requests" TO "authenticated";
 GRANT ALL ON TABLE "public"."consumption_requests" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."send_consumption_jobs" TO "authenticated";
+GRANT SELECT ON TABLE "public"."send_consumption_jobs" TO "authenticated";
 GRANT ALL ON TABLE "public"."send_consumption_jobs" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."transactions" TO "authenticated";
+GRANT SELECT ON TABLE "public"."transactions" TO "authenticated";
 GRANT ALL ON TABLE "public"."transactions" TO "service_role";
 
 
-GRANT ALL ON TABLE "public"."consumption_request_details" TO "authenticated";
+GRANT SELECT ON TABLE "public"."consumption_request_details" TO "authenticated";
 GRANT ALL ON TABLE "public"."consumption_request_details" TO "service_role";
 
 
-GRANT ALL ON TABLE "public"."cron_job_monitor" TO "authenticated";
+GRANT SELECT ON TABLE "public"."cron_job_monitor" TO "authenticated";
 GRANT ALL ON TABLE "public"."cron_job_monitor" TO "service_role";
 
 
-GRANT ALL ON TABLE "public"."cron_job_status" TO "authenticated";
+GRANT SELECT ON TABLE "public"."cron_job_status" TO "authenticated";
 GRANT ALL ON TABLE "public"."cron_job_status" TO "service_role";
 
 
-GRANT ALL ON TABLE "public"."notifications_raw" TO "authenticated";
+GRANT SELECT ON TABLE "public"."notifications_raw" TO "authenticated";
 GRANT ALL ON TABLE "public"."notifications_raw" TO "service_role";
 
 
-GRANT ALL ON TABLE "public"."recent_cron_runs" TO "authenticated";
+GRANT SELECT ON TABLE "public"."recent_cron_runs" TO "authenticated";
 GRANT ALL ON TABLE "public"."recent_cron_runs" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."refunds" TO "authenticated";
+GRANT SELECT ON TABLE "public"."refunds" TO "authenticated";
 GRANT ALL ON TABLE "public"."refunds" TO "service_role";
 
 
-GRANT ALL ON TABLE "public"."usage_metrics" TO "authenticated";
+GRANT SELECT ON TABLE "public"."usage_metrics" TO "authenticated";
 GRANT ALL ON TABLE "public"."usage_metrics" TO "service_role";
 
 
 
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "postgres";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "authenticated";
+-- =====================================
+-- Section: Default Privileges
+-- =====================================
+-- Intentionally not granting sequence privileges to authenticated by default (least privilege)
+-- ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "service_role";
 
 
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "postgres";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "authenticated";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "service_role";
-
-
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "postgres";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "service_role";
+-- Intentionally not granting table privileges to authenticated by default (least privilege)
+-- ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "authenticated";
 
 
 
 RESET ALL;
+
+-- =============================
+-- Function privilege hardening
+-- =============================
+REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC;
+REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM anon, authenticated;
+
+-- 2) Ensure future functions stay private for typical object owners
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM anon, authenticated;
+ALTER DEFAULT PRIVILEGES FOR ROLE "pg_database_owner" IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+ALTER DEFAULT PRIVILEGES FOR ROLE "pg_database_owner" IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM anon, authenticated;
+
+-- 3) Grant back EXECUTE only where needed
+-- service_role retains execute privileges granted earlier; only authenticated needs explicit grant-back here.
+GRANT EXECUTE ON FUNCTION public.get_consumption_metrics_summary(text) TO authenticated;
+
+-- =============================
+-- Default privilege hardening (tables/sequences)
+-- =============================
+-- Revoke default table/sequence privileges from broad roles so new objects are private by default
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON TABLES FROM PUBLIC, anon, authenticated;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON SEQUENCES FROM PUBLIC, anon, authenticated;
+ALTER DEFAULT PRIVILEGES FOR ROLE "pg_database_owner" IN SCHEMA public REVOKE ALL ON TABLES FROM PUBLIC, anon, authenticated;
+ALTER DEFAULT PRIVILEGES FOR ROLE "pg_database_owner" IN SCHEMA public REVOKE ALL ON SEQUENCES FROM PUBLIC, anon, authenticated;
