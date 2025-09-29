@@ -220,13 +220,69 @@ else
 fi
 
 # Step 9: Create admin user
+ADMIN_LOGIN_SUMMARY="4. Login with the admin email (admin@refundswatter.com). Use the temporary password printed above and change it immediately."
+
 echo ""
 echo -e "${YELLOW}Step 9: Creating admin user...${NC}"
-curl -s -X POST \
+SETUP_ADMIN_RESPONSE=$(curl -s -X POST \
   "${API_URL}/functions/v1/setup-admin" \
   -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" \
-  -H "Content-Type: application/json" > /dev/null 2>&1 || true
-echo -e "${GREEN}✓ Admin user ready${NC}"
+  -H "Content-Type: application/json")
+
+if [ -z "$SETUP_ADMIN_RESPONSE" ]; then
+  echo -e "${RED}✗ Failed to contact setup-admin function${NC}"
+  echo -e "${YELLOW}  ℹ️  Re-run this step once connectivity is restored.${NC}"
+  ADMIN_LOGIN_SUMMARY="4. Re-run Step 9 once the setup-admin function is reachable before attempting to log in."
+else
+  INITIAL_PASSWORD=$(printf '%s' "$SETUP_ADMIN_RESPONSE" | python3 - <<'PY'
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    print((data.get('initial_password') or '').strip())
+except Exception:
+    print('')
+PY
+)
+
+  ADMIN_EXISTS=$(printf '%s' "$SETUP_ADMIN_RESPONSE" | python3 - <<'PY'
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    print('true' if data.get('exists') else 'false')
+except Exception:
+    print('false')
+PY
+)
+
+  ADMIN_ERROR=$(printf '%s' "$SETUP_ADMIN_RESPONSE" | python3 - <<'PY'
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    print((data.get('error') or '').strip())
+except Exception:
+    print('')
+PY
+)
+
+  if [ -n "$INITIAL_PASSWORD" ]; then
+    echo -e "${GREEN}✓ Admin user created${NC}"
+    echo "  Email: admin@refundswatter.com"
+    echo "  Temporary password: $INITIAL_PASSWORD"
+    echo "  Store this password securely and change it immediately after logging in."
+    ADMIN_LOGIN_SUMMARY="4. Login with email admin@refundswatter.com. Use the temporary password recorded above and change it immediately."
+  elif [ "$ADMIN_EXISTS" = "true" ]; then
+    echo -e "${GREEN}✓ Admin user already exists${NC}"
+    ADMIN_LOGIN_SUMMARY="4. Login with your existing admin credentials and ensure the password has been rotated."
+  elif [ -n "$ADMIN_ERROR" ]; then
+    echo -e "${RED}✗ Failed to create admin user${NC}"
+    echo "  Error: $ADMIN_ERROR"
+    ADMIN_LOGIN_SUMMARY="4. Resolve the setup-admin error above and rerun Step 9 before logging in."
+  else
+    echo -e "${YELLOW}ℹ️  Unexpected response from setup-admin:${NC}"
+    echo "  $SETUP_ADMIN_RESPONSE"
+    ADMIN_LOGIN_SUMMARY="4. Review the setup-admin output above before attempting to log in."
+  fi
+fi
 
 # Summary
 echo ""
@@ -241,6 +297,6 @@ echo "Next steps:"
 echo "1. Add Apple credentials in Supabase Dashboard"
 echo "2. Configure webhook URL: $API_URL/functions/v1/webhook"
 echo "3. Start web app: cd web && npm install && npm run dev"
-echo "4. Login: admin@refundswatter.com / ChangeMe123!"
+echo "$ADMIN_LOGIN_SUMMARY"
 echo ""
 echo "To reconfigure: edit .env.project and run ./setup-simple.sh"

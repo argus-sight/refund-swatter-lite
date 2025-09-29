@@ -117,7 +117,7 @@ export async function verifyAuth(
       const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
       const { data: adminUser, error: adminError } = await supabaseAdmin
         .from('admin_users')
-        .select('id')
+        .select('id, must_change_password')
         .eq('id', user.id)
         .single()
       
@@ -126,6 +126,19 @@ export async function verifyAuth(
           isValid: false,
           errorResponse: new Response(
             JSON.stringify({ error: 'Unauthorized: Admin access required' }),
+            { headers: corsHeaders, status: 403 }
+          )
+        }
+      }
+
+      if (adminUser.must_change_password) {
+        return {
+          isValid: false,
+          errorResponse: new Response(
+            JSON.stringify({ 
+              error: 'Password change required before accessing admin functions',
+              code: 'PASSWORD_RESET_REQUIRED'
+            }),
             { headers: corsHeaders, status: 403 }
           )
         }
