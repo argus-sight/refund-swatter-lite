@@ -34,9 +34,15 @@ if [ -z "$SUPABASE_PROJECT_REF" ] || [ "$SUPABASE_PROJECT_REF" = "your-project-r
     exit 1
 fi
 
-if [ -z "$SUPABASE_DB_PASSWORD" ] || [ "$SUPABASE_DB_PASSWORD" = "your-database-password-here" ]; then
-    echo -e "${RED}Error: SUPABASE_DB_PASSWORD not configured${NC}"
-    exit 1
+if [ -z "${SUPABASE_DB_PASSWORD:-}" ] || [ "$SUPABASE_DB_PASSWORD" = "your-database-password-here" ]; then
+    echo -n "Enter Supabase database password: "
+    read -rs SUPABASE_DB_PASSWORD_INPUT
+    echo ""
+    if [ -z "$SUPABASE_DB_PASSWORD_INPUT" ]; then
+        echo -e "${RED}Error: Supabase database password is required${NC}"
+        exit 1
+    fi
+    SUPABASE_DB_PASSWORD="$SUPABASE_DB_PASSWORD_INPUT"
 fi
 
 echo "Project: $SUPABASE_PROJECT_REF"
