@@ -41,20 +41,20 @@ COMMENT ON SCHEMA "public" IS 'standard public schema';
 
 
 CREATE OR REPLACE FUNCTION "public"."cleanup_old_data"("p_days_to_keep" integer DEFAULT 180) RETURNS "void"
-    LANGUAGE "plpgsql"
+    LANGUAGE "plpgsql" SET search_path = ''
     AS $$
 BEGIN
     -- Delete old notifications
-    DELETE FROM notifications_raw 
+    DELETE FROM public.notifications_raw 
     WHERE received_at < NOW() - (p_days_to_keep || ' days')::INTERVAL
     AND status = 'processed';
     
     -- Delete old API logs
-    DELETE FROM apple_api_logs
+    DELETE FROM public.apple_api_logs
     WHERE created_at < NOW() - INTERVAL '30 days';
     
     -- Delete old processed jobs
-    DELETE FROM send_consumption_jobs
+    DELETE FROM public.send_consumption_jobs
     WHERE created_at < NOW() - (p_days_to_keep || ' days')::INTERVAL
     AND status IN ('sent', 'failed');
 END;
@@ -65,7 +65,7 @@ ALTER FUNCTION "public"."cleanup_old_data"("p_days_to_keep" integer) OWNER TO "p
 
 
 CREATE OR REPLACE FUNCTION "public"."decode_jwt_payload"("jwt_token" "text") RETURNS "jsonb"
-    LANGUAGE "plpgsql"
+    LANGUAGE "plpgsql" SET search_path = ''
     AS $$
 DECLARE
     parts TEXT[];
@@ -135,7 +135,7 @@ ALTER FUNCTION "public"."get_apple_private_key"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."get_consumption_metrics_summary"("p_environment" "text" DEFAULT NULL::"text") RETURNS TABLE("total_requests" bigint, "sent_successfully" bigint, "failed_requests" bigint, "pending_requests" bigint, "avg_response_time_ms" numeric, "success_rate" numeric)
-    LANGUAGE "plpgsql"
+    LANGUAGE "plpgsql" SET search_path = ''
     AS $$
 BEGIN
     RETURN QUERY
@@ -146,8 +146,8 @@ BEGIN
         COUNT(*) FILTER (WHERE cr.status IN ('pending', 'calculating'))::BIGINT as pending_requests,
         ROUND(AVG(EXTRACT(EPOCH FROM (scj.sent_at - scj.created_at)) * 1000) FILTER (WHERE scj.sent_at IS NOT NULL), 2) as avg_response_time_ms,
         ROUND((COUNT(*) FILTER (WHERE cr.status = 'sent')::NUMERIC / NULLIF(COUNT(*), 0)) * 100, 2) as success_rate
-    FROM consumption_requests cr
-    LEFT JOIN send_consumption_jobs scj ON scj.consumption_request_id = cr.id
+    FROM public.consumption_requests cr
+    LEFT JOIN public.send_consumption_jobs scj ON scj.consumption_request_id = cr.id
     WHERE cr.created_at > NOW() - INTERVAL '30 days'
       AND (p_environment IS NULL OR cr.environment = p_environment);
 END;
@@ -162,7 +162,7 @@ COMMENT ON FUNCTION "public"."get_consumption_metrics_summary"("p_environment" "
 
 
 CREATE OR REPLACE FUNCTION "public"."get_lifetime_dollars_enum"("amount_in_cents" integer) RETURNS integer
-    LANGUAGE "plpgsql"
+    LANGUAGE "plpgsql" SET search_path = ''
     AS $$
 BEGIN
     -- Convert cents to dollars
@@ -198,7 +198,7 @@ COMMENT ON FUNCTION "public"."get_lifetime_dollars_enum"("amount_in_cents" integ
 
 
 CREATE OR REPLACE FUNCTION "public"."get_lifetime_dollars_enum"("amount" numeric) RETURNS integer
-    LANGUAGE "plpgsql"
+    LANGUAGE "plpgsql" SET search_path = ''
     AS $$
 BEGIN
   IF amount IS NULL OR amount = 0 THEN
@@ -224,7 +224,7 @@ ALTER FUNCTION "public"."get_lifetime_dollars_enum"("amount" numeric) OWNER TO "
 
 
 CREATE OR REPLACE FUNCTION "public"."get_playtime_enum"("minutes" integer) RETURNS integer
-    LANGUAGE "plpgsql"
+    LANGUAGE "plpgsql" SET search_path = ''
     AS $$
 BEGIN
   IF minutes IS NULL OR minutes = 0 THEN
@@ -252,7 +252,7 @@ ALTER FUNCTION "public"."get_playtime_enum"("minutes" integer) OWNER TO "postgre
 
 
 CREATE OR REPLACE FUNCTION "public"."handle_updated_at"() RETURNS "trigger"
-    LANGUAGE "plpgsql"
+    LANGUAGE "plpgsql" SET search_path = ''
     AS $$
 BEGIN
     NEW.updated_at = CURRENT_TIMESTAMP;
@@ -345,7 +345,7 @@ ALTER FUNCTION "public"."store_apple_private_key"("p_private_key" "text") OWNER 
 
 
 CREATE OR REPLACE FUNCTION "public"."update_updated_at_column"() RETURNS "trigger"
-    LANGUAGE "plpgsql"
+    LANGUAGE "plpgsql" SET search_path = ''
     AS $$
 BEGIN
     NEW.updated_at = NOW();
@@ -989,89 +989,135 @@ ALTER TABLE ONLY "public"."send_consumption_jobs"
 -- Section: RLS Policies & Enablement
 -- =====================================
 -- Policy: restrict config access to users listed in public.admin_users
-CREATE POLICY "Admin users can manage config" ON "public"."config" USING ((EXISTS ( SELECT 1
-   FROM "public"."admin_users"
-  WHERE ("admin_users"."id" = "auth"."uid"()))));
+CREATE POLICY "Admin users can manage config" ON "public"."config" USING (
+    EXISTS (
+        SELECT 1
+        FROM "public"."admin_users"
+        WHERE "admin_users"."id" = (SELECT "auth"."uid"())
+    )
+);
 
 
 -- Policy: let admin users schedule and update send_consumption_jobs
-CREATE POLICY "Admin users can manage consumption jobs" ON "public"."send_consumption_jobs" USING ((EXISTS ( SELECT 1
-   FROM "public"."admin_users"
-  WHERE ("admin_users"."id" = "auth"."uid"()))));
+CREATE POLICY "Admin users can manage consumption jobs" ON "public"."send_consumption_jobs" USING (
+    EXISTS (
+        SELECT 1
+        FROM "public"."admin_users"
+        WHERE "admin_users"."id" = (SELECT "auth"."uid"())
+    )
+);
 
 
 
 -- Policy: admin users can review consumption_requests records
-CREATE POLICY "Admin users can manage consumption requests" ON "public"."consumption_requests" USING ((EXISTS ( SELECT 1
-   FROM "public"."admin_users"
-  WHERE ("admin_users"."id" = "auth"."uid"()))));
+CREATE POLICY "Admin users can manage consumption requests" ON "public"."consumption_requests" USING (
+    EXISTS (
+        SELECT 1
+        FROM "public"."admin_users"
+        WHERE "admin_users"."id" = (SELECT "auth"."uid"())
+    )
+);
 
 
 
 -- Policy: admin users oversee inbound notifications_raw data
-CREATE POLICY "Admin users can manage raw notifications" ON "public"."notifications_raw" USING ((EXISTS ( SELECT 1
-   FROM "public"."admin_users"
-  WHERE ("admin_users"."id" = "auth"."uid"()))));
+CREATE POLICY "Admin users can manage raw notifications" ON "public"."notifications_raw" USING (
+    EXISTS (
+        SELECT 1
+        FROM "public"."admin_users"
+        WHERE "admin_users"."id" = (SELECT "auth"."uid"())
+    )
+);
 
 
 
 -- Policy: admin users maintain refunds table
-CREATE POLICY "Admin users can manage refunds" ON "public"."refunds" USING ((EXISTS ( SELECT 1
-   FROM "public"."admin_users"
-  WHERE ("admin_users"."id" = "auth"."uid"()))));
+CREATE POLICY "Admin users can manage refunds" ON "public"."refunds" USING (
+    EXISTS (
+        SELECT 1
+        FROM "public"."admin_users"
+        WHERE "admin_users"."id" = (SELECT "auth"."uid"())
+    )
+);
 
 
 
 -- Policy: admin users manage transactions entries
-CREATE POLICY "Admin users can manage transactions" ON "public"."transactions" USING ((EXISTS ( SELECT 1
-   FROM "public"."admin_users"
-  WHERE ("admin_users"."id" = "auth"."uid"()))));
+CREATE POLICY "Admin users can manage transactions" ON "public"."transactions" USING (
+    EXISTS (
+        SELECT 1
+        FROM "public"."admin_users"
+        WHERE "admin_users"."id" = (SELECT "auth"."uid"())
+    )
+);
 
 
 
 -- Policy: admin users may read apple_api_logs
-CREATE POLICY "Admin users can view api logs" ON "public"."apple_api_logs" FOR SELECT USING ((EXISTS ( SELECT 1
-   FROM "public"."admin_users"
-  WHERE ("admin_users"."id" = "auth"."uid"()))));
+CREATE POLICY "Admin users can view api logs" ON "public"."apple_api_logs" FOR SELECT USING (
+    EXISTS (
+        SELECT 1
+        FROM "public"."admin_users"
+        WHERE "admin_users"."id" = (SELECT "auth"."uid"())
+    )
+);
 
 
 
 -- Policy: admin users may inspect consumption_request_webhooks
-CREATE POLICY "Admin users can view consumption webhooks" ON "public"."consumption_request_webhooks" FOR SELECT USING ((EXISTS ( SELECT 1
-   FROM "public"."admin_users"
-  WHERE ("admin_users"."id" = "auth"."uid"()))));
+CREATE POLICY "Admin users can view consumption webhooks" ON "public"."consumption_request_webhooks" FOR SELECT USING (
+    EXISTS (
+        SELECT 1
+        FROM "public"."admin_users"
+        WHERE "admin_users"."id" = (SELECT "auth"."uid"())
+    )
+);
 
 
 
 -- Policy: admin users may read usage_metrics aggregates
-CREATE POLICY "Admin users can view usage metrics" ON "public"."usage_metrics" FOR SELECT USING ((EXISTS ( SELECT 1
-   FROM "public"."admin_users"
-  WHERE ("admin_users"."id" = "auth"."uid"()))));
+CREATE POLICY "Admin users can view usage metrics" ON "public"."usage_metrics" FOR SELECT USING (
+    EXISTS (
+        SELECT 1
+        FROM "public"."admin_users"
+        WHERE "admin_users"."id" = (SELECT "auth"."uid"())
+    )
+);
 
 
 
 -- Policy: service_role may ingest notifications_raw rows
-CREATE POLICY "Service role can insert notifications" ON "public"."notifications_raw" FOR INSERT WITH CHECK ((("auth"."jwt"() ->> 'role'::"text") = 'service_role'::"text"));
+CREATE POLICY "Service role can insert notifications" ON "public"."notifications_raw" FOR INSERT WITH CHECK (
+    ((SELECT "auth"."jwt"()) ->> 'role'::"text") = 'service_role'::"text"
+);
 
 
 
 -- Policy: service_role may ingest consumption_request_webhooks
-CREATE POLICY "Service role can insert webhooks" ON "public"."consumption_request_webhooks" FOR INSERT WITH CHECK ((("auth"."jwt"() ->> 'role'::"text") = 'service_role'::"text"));
+CREATE POLICY "Service role can insert webhooks" ON "public"."consumption_request_webhooks" FOR INSERT WITH CHECK (
+    ((SELECT "auth"."jwt"()) ->> 'role'::"text") = 'service_role'::"text"
+);
 
 
 
 -- Policy: service_role retains full control over admin_users table
-CREATE POLICY "Service role can manage admin users" ON "public"."admin_users" USING ((("auth"."jwt"() ->> 'role'::"text") = 'service_role'::"text"));
+CREATE POLICY "Service role can manage admin users" ON "public"."admin_users" USING (
+    ((SELECT "auth"."jwt"()) ->> 'role'::"text") = 'service_role'::"text"
+);
 
 
 
 -- Policy: service_role bypasses all RLS on config
-CREATE POLICY "Service role full access to config" ON "public"."config" USING ((("auth"."jwt"() ->> 'role'::"text") = 'service_role'::"text"));
+CREATE POLICY "Service role full access to config" ON "public"."config" USING (
+    ((SELECT "auth"."jwt"()) ->> 'role'::"text") = 'service_role'::"text"
+);
 
 
 
 -- Policy: each user may read their own admin_users row
-CREATE POLICY "Users can view own admin profile" ON "public"."admin_users" FOR SELECT USING (("auth"."uid"() = "id"));
+CREATE POLICY "Users can view own admin profile" ON "public"."admin_users" FOR SELECT USING (
+    (SELECT "auth"."uid"()) = "id"
+);
 
 
 
