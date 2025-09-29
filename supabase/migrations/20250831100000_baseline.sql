@@ -1084,44 +1084,10 @@ CREATE POLICY "Admin users can view usage metrics" ON "public"."usage_metrics" F
     )
 );
 
-
-
-
-
-
--- Policy: service_role may ingest notifications_raw rows
-CREATE POLICY "Service role can insert notifications" ON "public"."notifications_raw" FOR INSERT WITH CHECK (
-    ((SELECT "auth"."jwt"()) ->> 'role'::"text") = 'service_role'::"text"
-);
-
-
-
--- Policy: service_role may ingest consumption_request_webhooks
-CREATE POLICY "Service role can insert webhooks" ON "public"."consumption_request_webhooks" FOR INSERT WITH CHECK (
-    ((SELECT "auth"."jwt"()) ->> 'role'::"text") = 'service_role'::"text"
-);
-
-
-
--- Policy: service_role retains full control over admin_users table
-CREATE POLICY "Service role can manage admin users" ON "public"."admin_users" USING (
-    ((SELECT "auth"."jwt"()) ->> 'role'::"text") = 'service_role'::"text"
-);
-
-
-
--- Policy: service_role bypasses all RLS on config
-CREATE POLICY "Service role full access to config" ON "public"."config" USING (
-    ((SELECT "auth"."jwt"()) ->> 'role'::"text") = 'service_role'::"text"
-);
-
-
-
 -- Policy: each user may read their own admin_users row
 CREATE POLICY "Users can view own admin profile" ON "public"."admin_users" FOR SELECT TO authenticated USING (
     (SELECT "auth"."uid"()) = "id"
 );
-
 
 
 ALTER TABLE "public"."admin_users" ENABLE ROW LEVEL SECURITY;
