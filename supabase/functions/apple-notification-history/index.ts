@@ -14,11 +14,8 @@ const API_CALL_DELAY = 100
 
 async function getAppleJWT(supabase: any, requestId: string): Promise<string> {
   try {
-    console.log(`[${requestId}] Getting Apple JWT token...`)
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    
-    console.log(`[${requestId}] Calling apple-jwt function at: ${supabaseUrl}/functions/v1/apple-jwt`)
     const jwtStartTime = Date.now()
     
     const response = await fetch(`${supabaseUrl}/functions/v1/apple-jwt`, {
@@ -30,8 +27,6 @@ async function getAppleJWT(supabase: any, requestId: string): Promise<string> {
     })
     
     const jwtDuration = Date.now() - jwtStartTime
-    console.log(`[${requestId}] JWT generation response status: ${response.status} (took ${jwtDuration}ms)`)
-    
     if (!response.ok) {
       const errorData = await response.json()
       console.error(`[${requestId}] ❌ Failed to generate JWT:`, errorData)
@@ -39,9 +34,6 @@ async function getAppleJWT(supabase: any, requestId: string): Promise<string> {
     }
 
     const data = await response.json()
-    console.log(`[${requestId}] ✓ Apple JWT obtained successfully`)
-    console.log(`[${requestId}] JWT length: ${data.jwt?.length || 0} characters`)
-    console.log(`[${requestId}] JWT preview: ${data.jwt?.substring(0, 50)}...`)
     return data.jwt
   } catch (error) {
     console.error(`[${requestId}] ERROR getting Apple JWT:`, error)
@@ -58,10 +50,6 @@ async function fetchNotificationHistoryPage(
   supabase: any,
   requestId: string
 ): Promise<{ notifications: any[], hasMore: boolean, paginationToken: string | null }> {
-  
-  console.log(`[${requestId}] ========================================`)
-  console.log(`[${requestId}] Fetching page ${pageNumber}...`)
-  
   // Build URL with pagination token as query parameter
   let url = `${apiBase}/notifications/history`
   if (paginationToken) {
@@ -75,17 +63,11 @@ async function fetchNotificationHistoryPage(
   const startTime = Date.now()
 
   // Log the request details
-  console.log(`[${requestId}] >>> Apple API Request (Page ${pageNumber})`)
-  console.log(`[${requestId}] URL: ${url}`)
-  console.log(`[${requestId}] Method: POST`)
-  console.log(`[${requestId}] Request Body:`, JSON.stringify(body, null, 2))
   if (paginationToken) {
-    console.log(`[${requestId}] Pagination Token (in URL): ${paginationToken.substring(0, 20)}...`)
   }
 
   try {
     // Log API call to database (with full URL including query params)
-    console.log(`[${requestId}] Attempting to log API call to database...`)
     const { data: logData, error: logError } = await supabase
       .from('apple_api_logs')
       .insert({
@@ -107,13 +89,11 @@ async function fetchNotificationHistoryPage(
       console.error(`[${requestId}] Error details:`, JSON.stringify(logError, null, 2))
     } else if (logData) {
       logId = logData.id
-      console.log(`[${requestId}] ✓ Database log created with ID: ${logId}`)
     } else {
       console.warn(`[${requestId}] ⚠️ No error but also no log ID returned`)
     }
 
     // Make API request
-    console.log(`[${requestId}] Sending request to Apple API...`)
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -128,28 +108,15 @@ async function fetchNotificationHistoryPage(
     const duration = Date.now() - startTime
 
     // Log the response details
-    console.log(`[${requestId}] <<< Apple API Response (Page ${pageNumber})`)
-    console.log(`[${requestId}] Status: ${response.status}`)
-    console.log(`[${requestId}] Duration: ${duration}ms`)
-    console.log(`[${requestId}] Response Headers:`, Object.fromEntries(response.headers.entries()))
-    
     // Parse response for logging
     let responseData: any = null
     try {
       responseData = JSON.parse(responseText)
-      console.log(`[${requestId}] Response Body:`, JSON.stringify({
-        hasMore: responseData.hasMore,
-        paginationToken: responseData.paginationToken ? `${responseData.paginationToken.substring(0, 20)}...` : null,
-        notificationHistoryCount: responseData.notificationHistory?.length || 0,
-        errorMessage: responseData.errorMessage
-      }, null, 2))
     } catch (e) {
-      console.log(`[${requestId}] Response Body (raw):`, responseText.substring(0, 500))
     }
 
     // Update database log with response
     if (logId) {
-      console.log(`[${requestId}] Updating database log ${logId} with response...`)
       const { error: updateError } = await supabase
         .from('apple_api_logs')
         .update({
@@ -163,7 +130,6 @@ async function fetchNotificationHistoryPage(
       if (updateError) {
         console.error(`[${requestId}] ⚠️ Failed to update database log:`, updateError)
       } else {
-        console.log(`[${requestId}] ✓ Database log updated with response`)
       }
     } else {
       console.warn(`[${requestId}] ⚠️ No log ID available, skipping response logging`)
@@ -190,10 +156,6 @@ async function fetchNotificationHistoryPage(
     }
 
     const data = responseData || JSON.parse(responseText)
-    console.log(`[${requestId}] ✓ Page ${pageNumber} fetched successfully`)
-    console.log(`[${requestId}] - Has more pages: ${data.hasMore}`)
-    console.log(`[${requestId}] - Notifications in this page: ${data.notificationHistory?.length || 0}`)
-
     // Parse signed payloads
     const notifications = (data.notificationHistory || []).map((item: any) => {
       try {
@@ -240,21 +202,10 @@ async function fetchAllNotificationHistory(
   let hasMore = true
   let paginationToken: string | null = null
   let pageNumber = 1
-
-  console.log(`[${requestId}] ============================================================`)
-  console.log(`[${requestId}] Starting to fetch all notification history pages...`)
-  console.log(`[${requestId}] ============================================================`)
-  console.log(`[${requestId}] Environment: ${environment}`)
-  console.log(`[${requestId}] API Base URL: ${apiBase}`)
-  console.log(`[${requestId}] Request parameters:`, JSON.stringify(requestBody, null, 2))
-  console.log(`[${requestId}] Max pages limit: ${MAX_PAGES}`)
-  console.log(`[${requestId}] Delay between calls: ${API_CALL_DELAY}ms`)
-
   while (hasMore && pageNumber <= MAX_PAGES) {
     try {
       // Add delay between API calls (except for the first call)
       if (pageNumber > 1) {
-        console.log(`[${requestId}] Waiting ${API_CALL_DELAY}ms before next request...`)
         await new Promise(resolve => setTimeout(resolve, API_CALL_DELAY))
       }
 
@@ -271,19 +222,12 @@ async function fetchAllNotificationHistory(
       // Add notifications from this page to the total
       const previousCount = allNotifications.length
       allNotifications.push(...pageResult.notifications)
-      
-      console.log(`[${requestId}] Page ${pageNumber} processing complete:`)
-      console.log(`[${requestId}] - Notifications added: ${pageResult.notifications.length}`)
-      console.log(`[${requestId}] - Total notifications: ${previousCount} -> ${allNotifications.length}`)
-      
       // Update pagination state
       hasMore = pageResult.hasMore
       paginationToken = pageResult.paginationToken
 
       if (hasMore) {
-        console.log(`[${requestId}] More pages available, continuing...`)
       } else {
-        console.log(`[${requestId}] No more pages available, stopping pagination`)
       }
 
       pageNumber++
@@ -300,45 +244,23 @@ async function fetchAllNotificationHistory(
     console.warn(`[${requestId}] ⚠️ WARNING: Reached maximum page limit (${MAX_PAGES})`)
     console.warn(`[${requestId}] There may be more data available but stopping to prevent infinite loops`)
   }
-
-  console.log(`[${requestId}] ============================================================`)
-  console.log(`[${requestId}] ✓ Finished fetching notification history`)
-  console.log(`[${requestId}] - Total pages fetched: ${pageNumber - 1}`)
-  console.log(`[${requestId}] - Total notifications: ${allNotifications.length}`)
-  
   // Check how many API logs were created
-  console.log(`[${requestId}] Checking database logs...`)
   const { data: logCount, error: logCountError } = await supabase
     .from('apple_api_logs')
     .select('id', { count: 'exact', head: true })
     .like('notes', `%Request ID: ${requestId}%`)
   
   if (!logCountError) {
-    console.log(`[${requestId}] - Database logs created for this request: ${logCount || 0}`)
   }
-  
-  console.log(`[${requestId}] ============================================================`)
-
   return allNotifications
 }
 
 serve(async (req) => {
   const requestId = crypto.randomUUID()
   const startTime = Date.now()
-  
-  console.log(`[${requestId}] ************************************************************`)
-  console.log(`[${requestId}] ==> Apple Notification History Request Started`)
-  console.log(`[${requestId}] Request ID: ${requestId}`)
-  console.log(`[${requestId}] Timestamp: ${new Date().toISOString()}`)
-  console.log(`[${requestId}] Method: ${req.method}`)
-  console.log(`[${requestId}] URL: ${req.url}`)
-  console.log(`[${requestId}] Headers:`, Object.fromEntries(req.headers.entries()))
-  console.log(`[${requestId}] ************************************************************`)
-  
   // Handle CORS preflight
   const corsResponse = handleCors(req)
   if (corsResponse) {
-    console.log(`[${requestId}] CORS preflight request handled`)
     return corsResponse
   }
 
@@ -349,12 +271,8 @@ serve(async (req) => {
   })
 
   if (!auth.isValid) {
-    console.log(`[${requestId}] Authentication failed`)
     return auth.errorResponse!
   }
-
-  console.log(`[${requestId}] Authenticated: ${auth.isServiceRole ? 'Service Role' : `User ${auth.user?.email}`}`)
-
   try {
     // Parse request body
     const body = await req.json()
@@ -365,14 +283,6 @@ serve(async (req) => {
       notificationType,  // Changed from notificationTypes (plural) to notificationType (singular)
       transactionId 
     } = body
-
-    console.log(`[${requestId}] Parsed request body:`)
-    console.log(`[${requestId}] - Environment: ${environment}`)
-    console.log(`[${requestId}] - Start Date: ${startDate || 'not specified'}`)
-    console.log(`[${requestId}] - End Date: ${endDate || 'not specified'}`)
-    console.log(`[${requestId}] - Notification Type: ${notificationType || 'all types'}`)  // Updated log
-    console.log(`[${requestId}] - Transaction ID: ${transactionId || 'not specified'}`)
-    
     // Validate that both transactionId and notificationType are not provided together
     if (transactionId && notificationType) {
       console.error(`[${requestId}] Error: Cannot provide both transactionId and notificationType`)
@@ -389,7 +299,6 @@ serve(async (req) => {
     }
 
     // Initialize Supabase client
-    console.log(`[${requestId}] Initializing Supabase client...`)
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
@@ -409,14 +318,12 @@ serve(async (req) => {
       // Format: "YYYY-MM-DD" -> treat as UTC date at 00:00:00.000
       const startDateTime = new Date(startDate + 'T00:00:00.000Z')
       parsedStartDate = startDateTime.getTime()
-      console.log(`[${requestId}] Parsed start date: ${startDate} -> ${startDateTime.toISOString()} (${parsedStartDate})`)
     }
     
     if (endDate) {
       // Format: "YYYY-MM-DD" -> treat as UTC date at 23:59:59.999
       const endDateTime = new Date(endDate + 'T23:59:59.999Z')
       parsedEndDate = endDateTime.getTime()
-      console.log(`[${requestId}] Parsed end date: ${endDate} -> ${endDateTime.toISOString()} (${parsedEndDate})`)
     }
     
     // Step 2: Apply default values if not provided
@@ -425,19 +332,16 @@ serve(async (req) => {
       const today = new Date()
       today.setUTCHours(23, 59, 59, 999)
       parsedEndDate = today.getTime()
-      console.log(`[${requestId}] No end date provided, using today: ${today.toISOString()} (${parsedEndDate})`)
     }
     
     if (!parsedStartDate) {
       // Default: 30 days before end date (30 days - 1ms to ensure exactly 30 days)
       parsedStartDate = parsedEndDate - (30 * 24 * 60 * 60 * 1000 - 1)
-      console.log(`[${requestId}] No start date provided, using 30 days before end: ${new Date(parsedStartDate).toISOString()} (${parsedStartDate})`)
     }
     
     // Step 3: Normalize and validate
     // 3.1: Swap if endDate < startDate
     if (parsedEndDate < parsedStartDate) {
-      console.log(`[${requestId}] End date is before start date, swapping them`)
       const temp = parsedStartDate
       parsedStartDate = parsedEndDate
       parsedEndDate = temp
@@ -447,10 +351,8 @@ serve(async (req) => {
     const rangeInMs = parsedEndDate - parsedStartDate
     const maxRangeMs = 180 * 24 * 60 * 60 * 1000 - 1 // 180 days minus 1ms
     if (rangeInMs > maxRangeMs) {
-      console.log(`[${requestId}] Date range ${(rangeInMs / (24 * 60 * 60 * 1000)).toFixed(2)} days exceeds 180 days limit`)
       // Adjust startDate to be exactly 180 days - 1ms before endDate
       parsedStartDate = parsedEndDate - maxRangeMs
-      console.log(`[${requestId}] Adjusted start date to: ${new Date(parsedStartDate).toISOString()} (${parsedStartDate})`)
     }
     
     // 3.3: Clamp endDate if it's in the future
@@ -459,14 +361,12 @@ serve(async (req) => {
     const todayEndMs = todayEnd.getTime()
     
     if (parsedEndDate > todayEndMs) {
-      console.log(`[${requestId}] End date is in the future, clamping to today: ${todayEnd.toISOString()}`)
       parsedEndDate = todayEndMs
       
       // Re-check the 180-day constraint after clamping
       const newRangeInMs = parsedEndDate - parsedStartDate
       if (newRangeInMs > maxRangeMs) {
         parsedStartDate = parsedEndDate - maxRangeMs
-        console.log(`[${requestId}] Re-adjusted start date after clamping: ${new Date(parsedStartDate).toISOString()}`)
       }
     }
     
@@ -475,9 +375,6 @@ serve(async (req) => {
     requestBody.endDate = parsedEndDate
     
     const finalRangeDays = (parsedEndDate - parsedStartDate) / (24 * 60 * 60 * 1000)
-    console.log(`[${requestId}] Final date range: ${finalRangeDays.toFixed(2)} days`)
-    console.log(`[${requestId}] Final start date: ${new Date(parsedStartDate).toISOString()} (${parsedStartDate})`)
-    console.log(`[${requestId}] Final end date: ${new Date(parsedEndDate).toISOString()} (${parsedEndDate})`)
     if (notificationType) {
       requestBody.notificationType = notificationType  // Use singular form as per Apple API spec
     }
@@ -495,14 +392,6 @@ serve(async (req) => {
     )
 
     const duration = Date.now() - startTime
-    
-    console.log(`[${requestId}] ************************************************************`)
-    console.log(`[${requestId}] ==> Request Completed Successfully`)
-    console.log(`[${requestId}] Total notifications fetched: ${allNotifications.length}`)
-    console.log(`[${requestId}] Total processing time: ${duration}ms`)
-    console.log(`[${requestId}] Response being sent to client`)
-    console.log(`[${requestId}] ************************************************************`)
-
     return new Response(
       JSON.stringify({
         notifications: allNotifications,

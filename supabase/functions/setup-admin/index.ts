@@ -108,9 +108,6 @@ serve(async (req) => {
       await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
       throw insertError
     }
-
-    console.log('Default admin user created successfully')
-
     return new Response(
       JSON.stringify({ 
         message: 'Default admin user created successfully',

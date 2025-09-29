@@ -51,7 +51,6 @@ serve(async (req) => {
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
     
     // Store private key using the vault function
-    console.log('Storing private key in database...')
     const { data, error } = await supabaseAdmin
       .rpc('store_apple_private_key', {
         p_private_key: privateKey
@@ -70,9 +69,6 @@ serve(async (req) => {
         }
       )
     }
-
-    console.log('Private key stored successfully', { secretId: data })
-    
     return new Response(
       JSON.stringify({ 
         success: true,

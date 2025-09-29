@@ -6,15 +6,9 @@ import { verifyAuth, handleCors, getCorsHeaders } from '../_shared/auth.ts'
 serve(async (req) => {
   const requestId = crypto.randomUUID()
   const startTime = Date.now()
-  
-  console.log(`[${requestId}] ==> Apple JWT Generation Request Started`)
-  console.log(`[${requestId}] Method: ${req.method}`)
-  console.log(`[${requestId}] URL: ${req.url}`)
-  
   // Handle CORS preflight
   const corsResponse = handleCors(req)
   if (corsResponse) {
-    console.log(`[${requestId}] CORS preflight request handled`)
     return corsResponse
   }
 
@@ -25,33 +19,22 @@ serve(async (req) => {
   })
 
   if (!auth.isValid || !auth.isServiceRole) {
-    console.log(`[${requestId}] Authentication failed, Service role only`)
     return auth.errorResponse!
   }
-
-  console.log(`[${requestId}] Authenticated: ${auth.isServiceRole ? 'Service Role' : 'User'}`)
-
   try {
     // Parse request body if needed (not used in single-tenant setup)
     if (req.method === 'POST') {
       try {
         const body = await req.json()
-        console.log(`[${requestId}] Request body received (ignored in single-tenant mode)`)
       } catch (e) {
-        console.log(`[${requestId}] No request body or invalid JSON`)
       }
     }
     
     // Initialize Supabase client
-    console.log(`[${requestId}] Initializing Supabase client...`)
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    console.log(`[${requestId}] Supabase client initialized`)
-
     // Get config from database - using config table (single tenant)
-    console.log(`[${requestId}] Fetching Apple configuration from database...`)
-    
     const { data: config, error: configError } = await supabase
       .from('config')
       .select('bundle_id, apple_issuer_id, apple_key_id')
@@ -67,11 +50,6 @@ serve(async (req) => {
       console.error(`[${requestId}] ERROR: No configuration found in database`)
       throw new Error('Configuration not found')
     }
-
-    console.log(`[${requestId}] Configuration fetched successfully`)
-    console.log(`[${requestId}] Issuer ID: ${config.apple_issuer_id ? 'Present' : 'Missing'}`)
-    console.log(`[${requestId}] Key ID: ${config.apple_key_id ? 'Present' : 'Missing'}`)
-
     if (!config.apple_issuer_id || !config.apple_key_id) {
       console.error(`[${requestId}] ERROR: Apple credentials not properly configured`)
       console.error(`[${requestId}] Missing: ${!config.apple_issuer_id ? 'apple_issuer_id' : ''} ${!config.apple_key_id ? 'apple_key_id' : ''}`)
@@ -79,7 +57,6 @@ serve(async (req) => {
     }
 
     // Get private key from vault/database (single tenant)
-    console.log(`[${requestId}] Retrieving Apple private key from vault`)
     const { data: privateKeyData, error: keyError } = await supabase
       .rpc('get_apple_private_key')
 
@@ -93,29 +70,16 @@ serve(async (req) => {
       console.error(`[${requestId}] ERROR: Private key data is empty`)
       throw new Error('Private key not found')
     }
-
-    console.log(`[${requestId}] Private key retrieved successfully`)
-    console.log(`[${requestId}] Key length: ${privateKeyData.length} characters`)
-
     // Import the private key
-    console.log(`[${requestId}] Importing private key for ES256 algorithm...`)
     let privateKey
     try {
       privateKey = await jose.importPKCS8(privateKeyData, 'ES256')
-      console.log(`[${requestId}] ✓ Private key imported successfully`)
     } catch (importError) {
       console.error(`[${requestId}] ERROR importing private key:`, importError)
       throw new Error('Invalid private key format')
     }
 
     // Create JWT with Apple's required claims
-    console.log(`[${requestId}] Creating JWT with Apple claims...`)
-    console.log(`[${requestId}] JWT Header: { alg: 'ES256', kid: '${config.apple_key_id}', typ: 'JWT' }`)
-    console.log(`[${requestId}] JWT Issuer: ${config.apple_issuer_id}`)
-    console.log(`[${requestId}] JWT Bundle ID (bid): ${config.bundle_id}`)
-    console.log(`[${requestId}] JWT Audience: appstoreconnect-v1`)
-    console.log(`[${requestId}] JWT Expiration: 1 hour`)
-    
     const jwt = await new jose.SignJWT({ bid: config.bundle_id })
       .setProtectedHeader({ 
         alg: 'ES256',
@@ -127,29 +91,14 @@ serve(async (req) => {
       .setExpirationTime('1h')
       .setAudience('appstoreconnect-v1')
       .sign(privateKey)
-
-    console.log(`[${requestId}] ✓ JWT generated successfully`)
-    console.log(`[${requestId}] JWT length: ${jwt.length} characters`)
-    
     // Decode to verify structure (for logging purposes only)
     const parts = jwt.split('.')
     if (parts.length === 3) {
       const header = JSON.parse(atob(parts[0]))
       const payload = JSON.parse(atob(parts[1]))
-      console.log(`[${requestId}] JWT verification:`)
-      console.log(`[${requestId}]   - Header algorithm: ${header.alg}`)
-      console.log(`[${requestId}]   - Header key ID: ${header.kid}`)
-      console.log(`[${requestId}]   - Payload issuer: ${payload.iss}`)
-      console.log(`[${requestId}]   - Payload bundle ID (bid): ${payload.bid}`)
-      console.log(`[${requestId}]   - Payload audience: ${payload.aud}`)
-      console.log(`[${requestId}]   - Issued at: ${new Date(payload.iat * 1000).toISOString()}`)
-      console.log(`[${requestId}]   - Expires at: ${new Date(payload.exp * 1000).toISOString()}`)
     }
 
     const duration = Date.now() - startTime
-    console.log(`[${requestId}] ==> Request completed successfully`)
-    console.log(`[${requestId}] Total processing time: ${duration}ms`)
-
     return new Response(
       JSON.stringify({ 
         jwt,

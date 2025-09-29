@@ -29,7 +29,6 @@ serve(async (req) => {
     }
 
     const { user } = auth
-    console.log('User authenticated:', user.id)
     const { transactionId, environment } = await req.json()
     
     if (!transactionId) {

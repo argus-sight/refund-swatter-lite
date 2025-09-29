@@ -23,7 +23,6 @@ serve(async (req) => {
     }
 
     const { user } = auth
-    console.log('User authenticated:', user.id)
     const { notification_uuid } = await req.json()
 
     if (!notification_uuid) {

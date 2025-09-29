@@ -24,15 +24,10 @@ serve(async (req) => {
       console.error('Authentication failed')
       return auth.errorResponse!
     }
-    
-    console.log(`Authenticated: ${auth.isServiceRole ? 'Service Role' : `User ${auth.user?.email}`}`)
   } else {
-    console.log('Authenticated via cron secret')
   }
 
   try {
-    console.log('Processing consumption jobs...')
-    
     // Call send-consumption function to process pending jobs
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -51,8 +46,6 @@ serve(async (req) => {
     }
 
     const result = await response.json()
-    console.log('Job processing complete:', result)
-
     return new Response(
       JSON.stringify(result),
       { 
