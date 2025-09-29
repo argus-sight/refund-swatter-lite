@@ -181,7 +181,7 @@ FUNCTIONS=(
 FAILED_FUNCTIONS=()
 for func in "${FUNCTIONS[@]}"; do
     echo -n "  Deploying $func..."
-    ERROR_OUTPUT=$(supabase functions deploy "$func" --no-verify-jwt 2>&1)
+    ERROR_OUTPUT=$(supabase functions deploy "$func" --no-verify-jwt --use-api 2>&1)
     if [ $? -eq 0 ]; then
         echo -e " ${GREEN}✓${NC}"
     else
@@ -201,7 +201,7 @@ if [ ${#FAILED_FUNCTIONS[@]} -gt 0 ]; then
     echo ""
     echo -e "${YELLOW}To retry deployment manually, run:${NC}"
     for func in "${FAILED_FUNCTIONS[@]}"; do
-        echo "  supabase functions deploy $func --no-verify-jwt"
+        echo "  supabase functions deploy $func --no-verify-jwt --use-api"
     done
     echo ""
     echo -e "${YELLOW}Note: The setup will continue, but some features may not work properly.${NC}"

@@ -1084,6 +1084,14 @@ CREATE POLICY "Admin users can view usage metrics" ON "public"."usage_metrics" F
     )
 );
 
+-- Policy: admin users can update their own admin_users row
+CREATE POLICY "Admin users can update own profile" ON "public"."admin_users" FOR UPDATE TO authenticated USING (
+    (SELECT "auth"."uid"()) = "id"
+) WITH CHECK (
+    (SELECT "auth"."uid"()) = "id"
+);
+
+
 -- Policy: each user may read their own admin_users row
 CREATE POLICY "Users can view own admin profile" ON "public"."admin_users" FOR SELECT TO authenticated USING (
     (SELECT "auth"."uid"()) = "id"
