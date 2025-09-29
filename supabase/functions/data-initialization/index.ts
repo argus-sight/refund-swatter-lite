@@ -509,12 +509,13 @@ serve(async (req) => {
     const { count: pendingCount } = await supabase
       .from('notifications_raw')
       .select('*', { count: 'exact', head: true })
-      .eq('status', 'pending')
+      .eq('status', NotificationStatus.PENDING)
       .eq('environment', environment)
+      .eq('source', NotificationSource.HISTORY_API)
     
     // Trigger processing if we have new insertions OR existing pending notifications
     if (result.totalInserted > 0 || (pendingCount && pendingCount > 0)) {
-      const notificationsToProcess = result.totalInserted > 0 ? result.totalInserted : pendingCount
+      const notificationsToProcess = pendingCount ?? result.totalInserted ?? 0
       try {
         const supabaseUrl = Deno.env.get('SUPABASE_URL')!
         const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
