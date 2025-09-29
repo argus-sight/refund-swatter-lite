@@ -103,8 +103,6 @@ async function verifyAppleJWS(signedPayload: string): Promise<any> {
 
     const { payload } = await jose.jwtVerify(signedPayload, publicKey, {
       algorithms: ['ES256'],
-      issuer: APP_STORE_ISSUER,
-      audience: APP_STORE_AUDIENCE,
       clockTolerance: 60
     })
 
