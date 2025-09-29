@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { AppleEnvironment, normalizeEnvironment, NotificationStatus, NotificationSource } from '../_shared/constants.ts'
 import { verifyAuth, handleCors, getCorsHeaders } from '../_shared/auth.ts'
+import { getAppleJWT } from '../_shared/apple-jwt.ts'
 
 // Apple API base URLs
 const APPLE_API_BASE_PRODUCTION = 'https://api.storekit.itunes.apple.com/inApps/v1'
@@ -13,33 +14,6 @@ const MAX_PAGES = 100
 const API_CALL_DELAY = 100
 // Batch size for database insertions
 const DB_BATCH_SIZE = 50
-
-async function getAppleJWT(supabase: any, requestId: string): Promise<string> {
-  try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    
-    const response = await fetch(`${supabaseUrl}/functions/v1/apple-jwt`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${supabaseServiceKey}`,
-        'Content-Type': 'application/json'
-      }
-    })
-    
-    if (!response.ok) {
-      const errorData = await response.json()
-      console.error(`[${requestId}] Failed to generate JWT:`, errorData)
-      throw new Error(errorData.error || 'Failed to generate JWT')
-    }
-
-    const data = await response.json()
-    return data.jwt
-  } catch (error) {
-    console.error(`[${requestId}] ERROR getting Apple JWT:`, error)
-    throw new Error('Failed to get Apple JWT')
-  }
-}
 
 // Helper function to decode JWT without verification
 function decodeJWT(jwt: string): any {
@@ -444,7 +418,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     
     // Get Apple JWT
-    const jwt = await getAppleJWT(supabase, requestId)
+    const jwt = await getAppleJWT(requestId)
 
     // Build request body for Apple API following strict date logic rules
     const requestBody: any = {}

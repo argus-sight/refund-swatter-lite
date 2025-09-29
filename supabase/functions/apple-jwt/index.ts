@@ -22,13 +22,6 @@ serve(async (req) => {
     return auth.errorResponse!
   }
   try {
-    // Parse request body if needed (not used in single-tenant setup)
-    if (req.method === 'POST') {
-      try {
-        const body = await req.json()
-      } catch (e) {
-      }
-    }
     
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
@@ -91,12 +84,6 @@ serve(async (req) => {
       .setExpirationTime('1h')
       .setAudience('appstoreconnect-v1')
       .sign(privateKey)
-    // Decode to verify structure (for logging purposes only)
-    const parts = jwt.split('.')
-    if (parts.length === 3) {
-      const header = JSON.parse(atob(parts[0]))
-      const payload = JSON.parse(atob(parts[1]))
-    }
 
     const duration = Date.now() - startTime
     return new Response(
