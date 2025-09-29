@@ -989,7 +989,7 @@ ALTER TABLE ONLY "public"."send_consumption_jobs"
 -- Section: RLS Policies & Enablement
 -- =====================================
 -- Policy: restrict config access to users listed in public.admin_users
-CREATE POLICY "Admin users can manage config" ON "public"."config" USING (
+CREATE POLICY "Admin users can manage config" ON "public"."config" FOR ALL TO authenticated USING (
     EXISTS (
         SELECT 1
         FROM "public"."admin_users"
@@ -999,7 +999,7 @@ CREATE POLICY "Admin users can manage config" ON "public"."config" USING (
 
 
 -- Policy: let admin users schedule and update send_consumption_jobs
-CREATE POLICY "Admin users can manage consumption jobs" ON "public"."send_consumption_jobs" USING (
+CREATE POLICY "Admin users can manage consumption jobs" ON "public"."send_consumption_jobs" FOR ALL TO authenticated USING (
     EXISTS (
         SELECT 1
         FROM "public"."admin_users"
@@ -1010,7 +1010,7 @@ CREATE POLICY "Admin users can manage consumption jobs" ON "public"."send_consum
 
 
 -- Policy: admin users can review consumption_requests records
-CREATE POLICY "Admin users can manage consumption requests" ON "public"."consumption_requests" USING (
+CREATE POLICY "Admin users can manage consumption requests" ON "public"."consumption_requests" FOR ALL TO authenticated USING (
     EXISTS (
         SELECT 1
         FROM "public"."admin_users"
@@ -1021,7 +1021,7 @@ CREATE POLICY "Admin users can manage consumption requests" ON "public"."consump
 
 
 -- Policy: admin users oversee inbound notifications_raw data
-CREATE POLICY "Admin users can manage raw notifications" ON "public"."notifications_raw" USING (
+CREATE POLICY "Admin users can manage raw notifications" ON "public"."notifications_raw" FOR ALL TO authenticated USING (
     EXISTS (
         SELECT 1
         FROM "public"."admin_users"
@@ -1032,7 +1032,7 @@ CREATE POLICY "Admin users can manage raw notifications" ON "public"."notificati
 
 
 -- Policy: admin users maintain refunds table
-CREATE POLICY "Admin users can manage refunds" ON "public"."refunds" USING (
+CREATE POLICY "Admin users can manage refunds" ON "public"."refunds" FOR ALL TO authenticated USING (
     EXISTS (
         SELECT 1
         FROM "public"."admin_users"
@@ -1043,7 +1043,7 @@ CREATE POLICY "Admin users can manage refunds" ON "public"."refunds" USING (
 
 
 -- Policy: admin users manage transactions entries
-CREATE POLICY "Admin users can manage transactions" ON "public"."transactions" USING (
+CREATE POLICY "Admin users can manage transactions" ON "public"."transactions" FOR ALL TO authenticated USING (
     EXISTS (
         SELECT 1
         FROM "public"."admin_users"
@@ -1054,7 +1054,7 @@ CREATE POLICY "Admin users can manage transactions" ON "public"."transactions" U
 
 
 -- Policy: admin users may read apple_api_logs
-CREATE POLICY "Admin users can view api logs" ON "public"."apple_api_logs" FOR SELECT USING (
+CREATE POLICY "Admin users can view api logs" ON "public"."apple_api_logs" FOR SELECT TO authenticated USING (
     EXISTS (
         SELECT 1
         FROM "public"."admin_users"
@@ -1065,7 +1065,7 @@ CREATE POLICY "Admin users can view api logs" ON "public"."apple_api_logs" FOR S
 
 
 -- Policy: admin users may inspect consumption_request_webhooks
-CREATE POLICY "Admin users can view consumption webhooks" ON "public"."consumption_request_webhooks" FOR SELECT USING (
+CREATE POLICY "Admin users can view consumption webhooks" ON "public"."consumption_request_webhooks" FOR SELECT TO authenticated USING (
     EXISTS (
         SELECT 1
         FROM "public"."admin_users"
@@ -1076,13 +1076,16 @@ CREATE POLICY "Admin users can view consumption webhooks" ON "public"."consumpti
 
 
 -- Policy: admin users may read usage_metrics aggregates
-CREATE POLICY "Admin users can view usage metrics" ON "public"."usage_metrics" FOR SELECT USING (
+CREATE POLICY "Admin users can view usage metrics" ON "public"."usage_metrics" FOR SELECT TO authenticated USING (
     EXISTS (
         SELECT 1
         FROM "public"."admin_users"
         WHERE "admin_users"."id" = (SELECT "auth"."uid"())
     )
 );
+
+
+
 
 
 
@@ -1115,7 +1118,7 @@ CREATE POLICY "Service role full access to config" ON "public"."config" USING (
 
 
 -- Policy: each user may read their own admin_users row
-CREATE POLICY "Users can view own admin profile" ON "public"."admin_users" FOR SELECT USING (
+CREATE POLICY "Users can view own admin profile" ON "public"."admin_users" FOR SELECT TO authenticated USING (
     (SELECT "auth"."uid"()) = "id"
 );
 
