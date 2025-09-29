@@ -57,10 +57,35 @@ echo -e "${GREEN}✓ Project linked${NC}"
 echo -e "${YELLOW}Step 2: Getting API keys...${NC}"
 KEYS_OUTPUT=$(supabase projects api-keys --project-ref "$SUPABASE_PROJECT_REF")
 ANON_KEY=$(echo "$KEYS_OUTPUT" | grep "anon" | awk '{print $NF}')
-SERVICE_ROLE_KEY=$(echo "$KEYS_OUTPUT" | grep "service_role" | awk '{print $NF}')
+SERVICE_ROLE_KEY_RAW=$(echo "$KEYS_OUTPUT" | grep "service_role" | awk '{print $NF}')
 API_URL="https://$SUPABASE_PROJECT_REF.supabase.co"
 CRON_SECRET=$(openssl rand -hex 32)
 echo -e "${GREEN}✓ Keys retrieved${NC}"
+
+# Prompt user if service role key is not already provided via environment.
+if [ -n "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+    SERVICE_ROLE_KEY="$SUPABASE_SERVICE_ROLE_KEY"
+else
+    echo ""
+    echo -e "${YELLOW}Service role key required${NC}"
+    echo "  --> Visit Supabase Dashboard > Project Settings > API."
+    echo "  --> Copy the 'service_role' key (never share it publicly)."
+    echo ""
+    if [ -n "$SERVICE_ROLE_KEY_RAW" ]; then
+        echo -e "${YELLOW}Detected service_role key in CLI output. For safety, it will not be printed.${NC}"
+        SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY_RAW"
+    fi
+    
+    if [ -z "$SERVICE_ROLE_KEY" ]; then
+        read -rsp "Paste service_role key: " SERVICE_ROLE_KEY_INPUT
+        echo ""
+        if [ -z "$SERVICE_ROLE_KEY_INPUT" ]; then
+            echo -e "${RED}Error: service_role key is required to continue${NC}"
+            exit 1
+        fi
+        SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY_INPUT"
+    fi
+fi
 
 # Step 3: Generate web/.env from .env.project values
 echo -e "${YELLOW}Step 3: Generating environment files...${NC}"
@@ -209,7 +234,8 @@ if [ "$SETUP_CRON" = "true" ]; then
     echo "     • URL: ${API_URL}/functions/v1/process-notifications-cron"
     echo ""
     echo "  4. Add Headers (click 'Add header' twice):"
-    echo "     • Authorization: Bearer ${SERVICE_ROLE_KEY}"
+    echo "     • Authorization: Bearer <SERVICE_ROLE_KEY>"
+    echo "       (Paste the service_role key copied from the Supabase dashboard; do not share it.)"
     echo "     • Content-Type: application/json"
     echo ""
     echo "  5. Request Body:"
