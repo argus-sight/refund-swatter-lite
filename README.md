@@ -63,6 +63,12 @@ Refund Swatter Lite significantly reduces malicious refund risks by processing A
 
 ## Quick Start
 
+### Prerequisites
+
+- [Supabase CLI](https://supabase.com/docs/guides/cli) installed and authenticated (`supabase login`).
+- `openssl` and `python3` available on your PATH for key generation and JSON parsing.
+- Node.js + npm installed for the dashboard (`node --version`, `npm --version`).
+
 1. **Clone and configure**
 ```bash
 git clone git@github.com:argus-sight/refund-swatter-lite.git
@@ -75,7 +81,7 @@ cp .env.project.example .env.project
 ```bash
 ./setup-simple.sh
 ```
-The script will output admin credentials (admin@refundswatter.com / ChangeMe123!) - change the password immediately after first login.
+The script prints the default admin email (`admin@refundswatter.com`) together with a freshly generated one-time password—store it securely and replace it right after the first sign-in.
 
 3. **Start web dashboard and configure Apple credentials**
 ```bash
@@ -102,11 +108,12 @@ Once set up, commits will automatically scan staged files for potential secrets.
 ```
 refund-swatter-lite/
 ├── supabase/
-│   ├── functions/      # Edge Functions
-│   └── migrations/     # Database schema
-├── web/                # Next.js dashboard
-├── scripts/            # Utility scripts
-└── .env.project        # Main configuration
+│   ├── functions/          # Supabase Edge Functions
+│   └── migrations/         # Database schema migrations
+├── web/                    # Next.js dashboard
+├── setup-simple.sh         # Guided Supabase setup script
+├── export_baseline.sh      # Helper to dump current DB schema
+└── .env.project.example    # Environment template copied to .env.project
 ```
 
 ## Dashboard Features
@@ -132,6 +139,10 @@ refund-swatter-lite/
 - Ensure correct environment selected
 - Verify Apple credentials are valid
 - Check `apple_api_logs` table for errors
+
+## FAQ
+
+See [FAQ.md](./FAQ.md) for answers to common questions, including local Supabase Docker usage and optional cron scheduling.
 
 ## Security
 
