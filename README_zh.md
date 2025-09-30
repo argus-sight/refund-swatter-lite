@@ -61,6 +61,12 @@ Refund Swatter Lite 实时处理 Apple 的 CONSUMPTION_REQUEST 通知，并立�
 
 ## 快速开始
 
+### 前置条件
+
+- 已安装 [Supabase CLI](https://supabase.com/docs/guides/cli) 并完成登录（`supabase login`）。
+- 系统中可使用 `openssl` 与 `python3`，用于生成随机密钥和解析 JSON。
+- 已安装 Node.js 与 npm（可通过 `node --version`、`npm --version` 验证）。
+
 1. **克隆并配置**
 ```bash
 git clone git@github.com:argus-sight/refund-swatter-lite.git
@@ -73,12 +79,13 @@ cp .env.project.example .env.project
 ```bash
 ./setup-simple.sh
 ```
+脚本会输出默认管理员邮箱（`admin@refundswatter.com`）以及自动生成的一次性密码——请妥善保存，并在首次登录后立即修改该密码。
 
 3. **启动 Web 仪表板并配置 Apple 凭据**
 ```bash
 cd web && npm install && npm run dev
 ```
-然后访问 `http://localhost:3000` 配置 Apple 凭据
+然后访问 `http://localhost:3000` 配置 Apple 凭据。
 
 4. **在 App Store Connect 中设置 webhook URL**：
    `https://[your-project-ref].supabase.co/functions/v1/webhook`
@@ -90,12 +97,22 @@ cd web && npm install && npm run dev
 ```
 refund-swatter-lite/
 ├── supabase/
-│   ├── functions/      # Edge Functions
-│   └── migrations/     # 数据库架构
-├── web/                # Next.js 仪表板
-├── scripts/            # 实用脚本
-└── .env.project        # 主配置文件
+│   ├── functions/          # Supabase Edge Functions
+│   └── migrations/         # 数据库迁移
+├── web/                    # Next.js 仪表板
+├── setup-simple.sh         # 引导式 Supabase 设置脚本
+├── export_baseline.sh      # 导出当前数据库结构的辅助脚本
+└── .env.project.example    # 环境变量模板，复制为 .env.project
 ```
+
+## 开发环境准备
+
+本地开发依赖 Git 钩子在提交前运行 [`gitleaks`](https://github.com/gitleaks/gitleaks)。在新机器上克隆仓库后请：
+
+1. 安装 Node 依赖并启用 Husky：`npm install && npx husky install`。
+2. 安装 `gitleaks` 以便预提交钩子运行。例如在 macOS 上执行 `brew install gitleaks`，或者从 GitHub 项目下载最新 Release 的二进制并加入 `PATH`。
+
+完成上述步骤后，提交会自动扫描暂存文件，防止敏感信息泄露。
 
 ## 仪表板功能
 
@@ -120,6 +137,10 @@ refund-swatter-lite/
 - 确保选择了正确的环境
 - 验证 Apple 凭据是否有效
 - 检查 `apple_api_logs` 表中的错误
+
+## 常见问题 FAQ
+
+更多问答请参阅 [FAQ_zh.md](./FAQ_zh.md)，涵盖本地 Supabase Docker、是否需要 cron 任务以及 `verify_jwt` 配置等问题。
 
 ## 安全性
 
