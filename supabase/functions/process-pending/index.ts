@@ -38,9 +38,6 @@ serve(async (req) => {
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const authHeader = req.headers.get('Authorization')!
-    
-    console.log(`Processing pending notifications: limit=${limit}, source=${source || 'all'}`)
-    
     // Get count of pending notifications using service role for accurate count
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
@@ -59,9 +56,6 @@ serve(async (req) => {
     if (countError) {
       throw new Error(`Failed to count pending notifications: ${countError.message}`)
     }
-    
-    console.log(`Found ${count || 0} pending notifications`)
-    
     if (!count || count === 0) {
       return new Response(
         JSON.stringify({
@@ -80,9 +74,6 @@ serve(async (req) => {
     // Calculate number of batches needed
     const batchSize = Math.min(limit, 50) // Max 50 per batch
     const batches = Math.ceil(count / batchSize)
-    
-    console.log(`Will process in ${batches} batch(es) of up to ${batchSize} notifications each`)
-    
     const results = []
     
     // Trigger processing for each batch
@@ -111,7 +102,6 @@ serve(async (req) => {
             requestId: data.requestId
           })
         } else {
-          console.log(`Batch ${i + 1} processed:`, data)
           results.push({
             batch: i + 1,
             success: true,

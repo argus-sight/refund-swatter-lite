@@ -45,19 +45,12 @@ serve(async (req) => {
         }
       )
     }
-    
-    console.log('Private key received', {
-      keyLength: privateKey.length,
-      keyPreview: privateKey.substring(0, 50) + '...'
-    })
-
     // Use service role key for storing secrets
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
     
     // Store private key using the vault function
-    console.log('Storing private key in database...')
     const { data, error } = await supabaseAdmin
       .rpc('store_apple_private_key', {
         p_private_key: privateKey
@@ -76,9 +69,6 @@ serve(async (req) => {
         }
       )
     }
-
-    console.log('Private key stored successfully', { secretId: data })
-    
     return new Response(
       JSON.stringify({ 
         success: true,

@@ -34,9 +34,15 @@ if [ -z "$SUPABASE_PROJECT_REF" ] || [ "$SUPABASE_PROJECT_REF" = "your-project-r
     exit 1
 fi
 
-if [ -z "$SUPABASE_DB_PASSWORD" ] || [ "$SUPABASE_DB_PASSWORD" = "your-database-password-here" ]; then
-    echo -e "${RED}Error: SUPABASE_DB_PASSWORD not configured${NC}"
-    exit 1
+if [ -z "${SUPABASE_DB_PASSWORD:-}" ] || [ "$SUPABASE_DB_PASSWORD" = "your-database-password-here" ]; then
+    echo -n "Enter Supabase database password: "
+    read -rs SUPABASE_DB_PASSWORD_INPUT
+    echo ""
+    if [ -z "$SUPABASE_DB_PASSWORD_INPUT" ]; then
+        echo -e "${RED}Error: Supabase database password is required${NC}"
+        exit 1
+    fi
+    SUPABASE_DB_PASSWORD="$SUPABASE_DB_PASSWORD_INPUT"
 fi
 
 echo "Project: $SUPABASE_PROJECT_REF"
@@ -44,17 +50,46 @@ echo ""
 
 # Step 1: Link project
 echo -e "${YELLOW}Step 1: Linking Supabase project...${NC}"
-supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD" 2>/dev/null || true
-echo -e "${GREEN}✓ Project linked${NC}"
+if supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"; then
+    echo -e "${GREEN}✓ Project linked${NC}"
+else
+    echo -e "${RED}Failed to link Supabase project. Please verify the project ref and database password.${NC}"
+    exit 1
+fi
 
 # Step 2: Generate environment files from .env.project
 echo -e "${YELLOW}Step 2: Getting API keys...${NC}"
 KEYS_OUTPUT=$(supabase projects api-keys --project-ref "$SUPABASE_PROJECT_REF")
 ANON_KEY=$(echo "$KEYS_OUTPUT" | grep "anon" | awk '{print $NF}')
-SERVICE_ROLE_KEY=$(echo "$KEYS_OUTPUT" | grep "service_role" | awk '{print $NF}')
+SERVICE_ROLE_KEY_RAW=$(echo "$KEYS_OUTPUT" | grep "service_role" | awk '{print $NF}')
 API_URL="https://$SUPABASE_PROJECT_REF.supabase.co"
 CRON_SECRET=$(openssl rand -hex 32)
 echo -e "${GREEN}✓ Keys retrieved${NC}"
+
+# Prompt user if service role key is not already provided via environment.
+if [ -n "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+    SERVICE_ROLE_KEY="$SUPABASE_SERVICE_ROLE_KEY"
+else
+    echo ""
+    echo -e "${YELLOW}Service role key required${NC}"
+    echo "  --> Visit Supabase Dashboard > Project Settings > API."
+    echo "  --> Copy the 'service_role' key (never share it publicly)."
+    echo ""
+    if [ -n "$SERVICE_ROLE_KEY_RAW" ]; then
+        echo -e "${YELLOW}Detected service_role key in CLI output. For safety, it will not be printed.${NC}"
+        SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY_RAW"
+    fi
+    
+    if [ -z "$SERVICE_ROLE_KEY" ]; then
+        read -rsp "Paste service_role key: " SERVICE_ROLE_KEY_INPUT
+        echo ""
+        if [ -z "$SERVICE_ROLE_KEY_INPUT" ]; then
+            echo -e "${RED}Error: service_role key is required to continue${NC}"
+            exit 1
+        fi
+        SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY_INPUT"
+    fi
+fi
 
 # Step 3: Generate web/.env from .env.project values
 echo -e "${YELLOW}Step 3: Generating environment files...${NC}"
@@ -84,7 +119,6 @@ if [ -d "web" ]; then
 # Auto-generated from .env.project
 NEXT_PUBLIC_SUPABASE_URL=$API_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY
-SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY
 SUPABASE_PROJECT_REF=$SUPABASE_PROJECT_REF
 CRON_SECRET=$CRON_SECRET
 NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
@@ -151,7 +185,7 @@ FUNCTIONS=(
 FAILED_FUNCTIONS=()
 for func in "${FUNCTIONS[@]}"; do
     echo -n "  Deploying $func..."
-    ERROR_OUTPUT=$(supabase functions deploy "$func" --no-verify-jwt 2>&1)
+    ERROR_OUTPUT=$(supabase functions deploy "$func" --no-verify-jwt --use-api 2>&1)
     if [ $? -eq 0 ]; then
         echo -e " ${GREEN}✓${NC}"
     else
@@ -171,7 +205,7 @@ if [ ${#FAILED_FUNCTIONS[@]} -gt 0 ]; then
     echo ""
     echo -e "${YELLOW}To retry deployment manually, run:${NC}"
     for func in "${FAILED_FUNCTIONS[@]}"; do
-        echo "  supabase functions deploy $func --no-verify-jwt"
+        echo "  supabase functions deploy $func --no-verify-jwt --use-api"
     done
     echo ""
     echo -e "${YELLOW}Note: The setup will continue, but some features may not work properly.${NC}"
@@ -204,7 +238,8 @@ if [ "$SETUP_CRON" = "true" ]; then
     echo "     • URL: ${API_URL}/functions/v1/process-notifications-cron"
     echo ""
     echo "  4. Add Headers (click 'Add header' twice):"
-    echo "     • Authorization: Bearer ${SERVICE_ROLE_KEY}"
+    echo "     • Authorization: Bearer <SERVICE_ROLE_KEY>"
+    echo "       (Paste the service_role key copied from the Supabase dashboard; do not share it.)"
     echo "     • Content-Type: application/json"
     echo ""
     echo "  5. Request Body:"
@@ -221,13 +256,69 @@ else
 fi
 
 # Step 9: Create admin user
+ADMIN_LOGIN_SUMMARY="4. Login with the admin email (admin@refundswatter.com). Use the temporary password printed above and change it immediately."
+
 echo ""
 echo -e "${YELLOW}Step 9: Creating admin user...${NC}"
-curl -s -X POST \
+SETUP_ADMIN_RESPONSE=$(curl -s -X POST \
   "${API_URL}/functions/v1/setup-admin" \
   -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" \
-  -H "Content-Type: application/json" > /dev/null 2>&1 || true
-echo -e "${GREEN}✓ Admin user ready${NC}"
+  -H "Content-Type: application/json")
+
+if [ -z "$SETUP_ADMIN_RESPONSE" ]; then
+  echo -e "${RED}✗ Failed to contact setup-admin function${NC}"
+  echo -e "${YELLOW}  ℹ️  Re-run this step once connectivity is restored.${NC}"
+  ADMIN_LOGIN_SUMMARY="4. Re-run Step 9 once the setup-admin function is reachable before attempting to log in."
+else
+  INITIAL_PASSWORD=$(printf '%s' "$SETUP_ADMIN_RESPONSE" | python3 - <<'PY'
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    print((data.get('initial_password') or '').strip())
+except Exception:
+    print('')
+PY
+)
+
+  ADMIN_EXISTS=$(printf '%s' "$SETUP_ADMIN_RESPONSE" | python3 - <<'PY'
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    print('true' if data.get('exists') else 'false')
+except Exception:
+    print('false')
+PY
+)
+
+  ADMIN_ERROR=$(printf '%s' "$SETUP_ADMIN_RESPONSE" | python3 - <<'PY'
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    print((data.get('error') or '').strip())
+except Exception:
+    print('')
+PY
+)
+
+  if [ -n "$INITIAL_PASSWORD" ]; then
+    echo -e "${GREEN}✓ Admin user created${NC}"
+    echo "  Email: admin@refundswatter.com"
+    echo "  Temporary password: $INITIAL_PASSWORD"
+    echo "  Store this password securely and change it immediately after logging in."
+    ADMIN_LOGIN_SUMMARY="4. Login with email admin@refundswatter.com. Use the temporary password recorded above and change it immediately."
+  elif [ "$ADMIN_EXISTS" = "true" ]; then
+    echo -e "${GREEN}✓ Admin user already exists${NC}"
+    ADMIN_LOGIN_SUMMARY="4. Login with your existing admin credentials and ensure the password has been rotated."
+  elif [ -n "$ADMIN_ERROR" ]; then
+    echo -e "${RED}✗ Failed to create admin user${NC}"
+    echo "  Error: $ADMIN_ERROR"
+    ADMIN_LOGIN_SUMMARY="4. Resolve the setup-admin error above and rerun Step 9 before logging in."
+  else
+    echo -e "${YELLOW}ℹ️  Unexpected response from setup-admin:${NC}"
+    echo "  $SETUP_ADMIN_RESPONSE"
+    ADMIN_LOGIN_SUMMARY="4. Review the setup-admin output above before attempting to log in."
+  fi
+fi
 
 # Summary
 echo ""
@@ -242,6 +333,6 @@ echo "Next steps:"
 echo "1. Add Apple credentials in Supabase Dashboard"
 echo "2. Configure webhook URL: $API_URL/functions/v1/webhook"
 echo "3. Start web app: cd web && npm install && npm run dev"
-echo "4. Login: admin@refundswatter.com / ChangeMe123!"
+echo "$ADMIN_LOGIN_SUMMARY"
 echo ""
 echo "To reconfigure: edit .env.project and run ./setup-simple.sh"

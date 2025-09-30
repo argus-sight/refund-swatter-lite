@@ -12,22 +12,38 @@ serve(async (req) => {
   }
 
   try {
-    // Verify authentication
+    // Enforce that only authenticated admin users can call this function.
+    // Even though Supabase verifies JWT signatures (verify_jwt = true),
+    // we still confirm that a valid Bearer token is present and that the
+    // associated user exists in the admin_users allowlist.
     const auth = await verifyAuth(req, {
       allowServiceRole: false,
-      requireAdmin: false
+      requireAdmin: true
     })
 
     if (!auth.isValid) {
       return auth.errorResponse!
     }
 
-    const { user } = auth
-    
-    // Use service role to access the data
+    // Create a Supabase client with the same privileges as the browser:
+    // - Use the anon key so database access remains subject to RLS policies.
+    // - Forward the caller's Bearer token so auth.uid() resolves to the user.
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
+    const authorizationHeader = req.headers.get('Authorization')
+
+    if (!authorizationHeader) {
+      throw new Error('Missing Authorization header')
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          // Forward the browser-issued Bearer token to preserve auth.uid()
+          Authorization: authorizationHeader
+        }
+      }
+    })
 
     if (req.method === 'GET') {
       // Fetch config

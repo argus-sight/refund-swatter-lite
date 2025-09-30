@@ -1,0 +1,10 @@
+#!/bin/sh
+
+echo "🔍 Running gitleaks on staged changes..."
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "gitleaks not found; install it first."
+  exit 1
+fi
+
+gitleaks protect --staged --redact --exit-code 1 --no-banner

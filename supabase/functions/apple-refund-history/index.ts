@@ -21,7 +21,7 @@ serve(async (req) => {
     // Verify authentication
     const auth = await verifyAuth(req, {
       allowServiceRole: false,
-      requireAdmin: false
+      requireAdmin: true
     })
 
     if (!auth.isValid) {
@@ -29,7 +29,6 @@ serve(async (req) => {
     }
 
     const { user } = auth
-    console.log('User authenticated:', user.id)
     const { transactionId, environment } = await req.json()
     
     if (!transactionId) {

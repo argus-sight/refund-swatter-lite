@@ -21,7 +21,7 @@ serve(async (req) => {
     // Verify authentication
     const auth = await verifyAuth(req, {
       allowServiceRole: false,
-      requireAdmin: false
+      requireAdmin: true
     })
 
     if (!auth.isValid) {
@@ -29,7 +29,6 @@ serve(async (req) => {
     }
 
     const { user } = auth
-    console.log('User authenticated:', user.id)
     const { transactionId, revision, environment } = await req.json()
     
     if (!transactionId) {
@@ -68,14 +67,6 @@ serve(async (req) => {
     if (revision) {
       url += `?revision=${revision}`
     }
-
-    console.log('Fetching transaction history:', {
-      url,
-      transactionId,
-      environment,
-      apiBase
-    })
-
     const startTime = Date.now()
     const response = await fetch(url, {
       method: 'GET',
