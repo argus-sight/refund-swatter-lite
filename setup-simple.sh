@@ -50,8 +50,12 @@ echo ""
 
 # Step 1: Link project
 echo -e "${YELLOW}Step 1: Linking Supabase project...${NC}"
-supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD" 2>/dev/null || true
-echo -e "${GREEN}✓ Project linked${NC}"
+if supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"; then
+    echo -e "${GREEN}✓ Project linked${NC}"
+else
+    echo -e "${RED}Failed to link Supabase project. Please verify the project ref and database password.${NC}"
+    exit 1
+fi
 
 # Step 2: Generate environment files from .env.project
 echo -e "${YELLOW}Step 2: Getting API keys...${NC}"
