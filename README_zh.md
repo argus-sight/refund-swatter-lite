@@ -129,6 +129,12 @@ refund-swatter-lite/
 - CRON_SECRET 保护计划端点
 - 不上传密钥到第三方（BYOK） — In-App Purchase Key 仅保存在你的 Supabase 项目中
 
+## 额外说明
+v1.0版本是由AI生成的，实现了基本的功能。
+v2.0版本代码仍然是AI写的，但是着重优化了安全和性能相关的内容，遵循 Supabase 安全和性能的最佳实践。我符合代码审核并引导AI按照最佳实践完成。核心代码都添加了详细的注释，便于理解和维护。
+
+感谢AI的发展，让我能独立完成这样一个有趣的项目。
+
 ## 许可证
 
 根据 Apache License 2.0 授权，详见 [LICENSE](./LICENSE)。

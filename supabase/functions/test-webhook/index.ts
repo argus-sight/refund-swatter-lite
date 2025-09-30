@@ -29,8 +29,6 @@ serve(async (req) => {
     }
 
     const { user } = auth
-    console.log('User authenticated:', user.id)
-
     if (req.method !== 'POST') {
       return new Response(
         JSON.stringify({ error: 'Method not allowed' }),
@@ -59,15 +57,7 @@ serve(async (req) => {
       console.error('Config error:', configError)
       throw new Error('Configuration not found')
     }
-    
-    console.log('Config loaded:', {
-      bundle_id: config.bundle_id,
-      apple_issuer_id: config.apple_issuer_id,
-      apple_key_id: config.apple_key_id
-    })
-    
     // Get Apple JWT
-    console.log('Calling apple-jwt function at:', `${supabaseUrl}/functions/v1/apple-jwt`)
     const jwtResponse = await fetch(`${supabaseUrl}/functions/v1/apple-jwt`, {
       method: 'POST',
       headers: {
@@ -76,12 +66,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({})
     })
-
-    console.log('JWT response status:', jwtResponse.status)
-    
     const responseText = await jwtResponse.text()
-    console.log('JWT response text:', responseText)
-    
     if (!jwtResponse.ok) {
       console.error('JWT generation failed:', responseText)
       throw new Error('Failed to generate Apple JWT')
@@ -104,9 +89,6 @@ serve(async (req) => {
       const jwtParts = jwt.split('.')
       const header = JSON.parse(atob(jwtParts[0]))
       const payload = JSON.parse(atob(jwtParts[1]))
-      console.log('JWT Header:', JSON.stringify(header, null, 2))
-      console.log('JWT Payload:', JSON.stringify(payload, null, 2))
-      console.log('Bundle ID from config:', config.bundle_id)
     } catch (decodeError) {
       console.error('Failed to decode JWT for logging:', decodeError)
     }
@@ -118,8 +100,6 @@ serve(async (req) => {
     const requestBody = {
       bundleId: config.bundle_id
     }
-    
-    console.log('Sending test notification to Apple:', apiUrl)
     const startTime = Date.now()
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -130,11 +110,7 @@ serve(async (req) => {
       body: JSON.stringify(requestBody)
     })
     const endTime = Date.now()
-
-    console.log('Apple API response status:', response.status)
     const appleResponseText = await response.text()
-    console.log('Apple API response body:', appleResponseText || '(empty)')
-    
     // Log the API request to apple_api_logs table
     let responseBody = null
     if (appleResponseText) {
@@ -163,7 +139,6 @@ serve(async (req) => {
     // Handle empty response for 401 errors
     if (response.status === 401) {
       console.error('Authentication failed. JWT may be invalid or Apple credentials are incorrect.')
-      console.log('JWT used:', jwt.substring(0, 50) + '...')
       return new Response(
         JSON.stringify({ 
           error: 'Apple API authentication failed. Please check your Apple credentials (Issuer ID, Key ID, and In-App Purchase Key).',

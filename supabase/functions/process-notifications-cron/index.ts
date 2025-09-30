@@ -10,8 +10,6 @@ serve(async (req) => {
   }
 
   const startTime = Date.now()
-  console.log('[CRON] Process notifications cron job started')
-
   // Check for cron secret first (backward compatibility)
   const cronSecret = req.headers.get('x-cron-secret')
   const expectedSecret = Deno.env.get('CRON_SECRET')
@@ -28,10 +26,7 @@ serve(async (req) => {
       console.error('[CRON] Authentication failed')
       return auth.errorResponse!
     }
-    
-    console.log(`[CRON] Authenticated: ${auth.isServiceRole ? 'Service Role' : `User ${auth.user?.email}`}`)
   } else {
-    console.log('[CRON] Authenticated via cron secret')
   }
 
   try {
@@ -81,7 +76,6 @@ serve(async (req) => {
     const totalPending = (pendingNotifications?.length || 0) + (failedNotifications?.length || 0)
     
     if (totalPending === 0) {
-      console.log('[CRON] No notifications to process')
       return new Response(
         JSON.stringify({ 
           message: 'No notifications to process',
@@ -93,11 +87,6 @@ serve(async (req) => {
         }
       )
     }
-
-    console.log(`[CRON] Found ${totalPending} notifications to process`)
-    console.log(`[CRON] - Pending: ${pendingNotifications?.length || 0}`)
-    console.log(`[CRON] - Failed (retry): ${failedNotifications?.length || 0}`)
-
     // Update retry count for failed notifications
     if (failedNotifications && failedNotifications.length > 0) {
       for (const notification of failedNotifications) {
@@ -130,9 +119,6 @@ serve(async (req) => {
     
     if (processResponse.ok) {
       processResult = await processResponse.json()
-      console.log(`[CRON] Processing completed:`)
-      console.log(`[CRON] - Processed: ${processResult.processed}`)
-      console.log(`[CRON] - Failed: ${processResult.failed}`)
     } else {
       console.error('[CRON] Failed to process notifications:', await processResponse.text())
     }
@@ -157,8 +143,6 @@ serve(async (req) => {
     }
 
     const duration = Date.now() - startTime
-    console.log(`[CRON] Cron job completed in ${duration}ms`)
-
     return new Response(
       JSON.stringify({ 
         processed: processResult.processed,

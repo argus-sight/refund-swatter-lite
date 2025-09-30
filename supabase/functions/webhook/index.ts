@@ -1,43 +1,116 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
+import 'https://esm.sh/reflect-metadata@0.2.2?target=denonext'
+import { X509Certificate } from 'https://esm.sh/@peculiar/x509@1.14.0?target=denonext'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import * as jose from 'https://deno.land/x/jose@v4.13.1/index.ts'
-import { AppleEnvironment, normalizeEnvironment, NotificationStatus, NotificationSource } from '../_shared/constants.ts'
+import { TRUSTED_APPLE_ROOT_CERTS, derBase64ToPem, normalizeCertificateBase64 } from '../_shared/apple-certificates.ts'
+import { normalizeEnvironment, NotificationStatus, NotificationSource } from '../_shared/constants.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const APP_STORE_ISSUER = 'appstoreconnect-v1'
+const APP_STORE_AUDIENCE = 'appstoreconnect-v1'
+
+function decodeBase64Url(input: string): string {
+  const normalized = input.replace(/-/g, '+').replace(/_/g, '/')
+  const padding = normalized.length % 4 === 0 ? '' : '='.repeat(4 - (normalized.length % 4))
+  return atob(normalized + padding)
+}
+
+// Apple includes the full certificate chain in the JWS header's x5c field:
+// [0] = leaf certificate (contains the public key used for the request),
+// [1] = Apple intermediate certificate, [last] = Apple root certificate.
+// This function validates each hop against the trusted root and checks
+// validity periods to ensure the leaf key truly originates from Apple
+// rather than an attacker-crafted self-signed chain.
+async function validateCertificateChain(x5c: string[]): Promise<void> {
+  if (!Array.isArray(x5c) || x5c.length < 3) {
+    throw new Error('Apple certificate chain must include leaf, intermediate, and root certificates')
+  }
+
+  const normalizedChain = x5c.map((entry) => normalizeCertificateBase64(entry))
+  const leafBase64 = normalizedChain[0]
+  const intermediateBase64 = normalizedChain[1]
+  const rootBase64 = normalizedChain[normalizedChain.length - 1]
+
+  const trustedRootPem = TRUSTED_APPLE_ROOT_CERTS.get(rootBase64)
+  if (!trustedRootPem) {
+    throw new Error('Unrecognized Apple root certificate')
+  }
+
+  const leafCert = new X509Certificate(derBase64ToPem(leafBase64))
+  const intermediateCert = new X509Certificate(derBase64ToPem(intermediateBase64))
+  const trustedRootCert = new X509Certificate(trustedRootPem)
+
+  const now = new Date()
+  if (now < leafCert.notBefore || now > leafCert.notAfter) {
+    throw new Error('Leaf certificate expired or not yet valid')
+  }
+
+  if (now < intermediateCert.notBefore || now > intermediateCert.notAfter) {
+    throw new Error('Intermediate certificate expired or not yet valid')
+  }
+
+  const intermediateValid = await intermediateCert.verify({ publicKey: trustedRootCert.publicKey })
+  if (!intermediateValid) {
+    throw new Error('Intermediate certificate not signed by trusted Apple root')
+  }
+
+  const leafValid = await leafCert.verify({ publicKey: intermediateCert.publicKey })
+  if (!leafValid) {
+    throw new Error('Leaf certificate not signed by Apple intermediate')
+  }
+
+}
+
+// App Store Server Notifications are delivered as JWS objects. To make sure
+// nothing is forged or tampered with we must verify that:
+// 1. the header advertises the expected algorithm/type;
+// 2. the x5c chain anchors back to Apple's trusted root;
+// 3. the JWS signature validates with the leaf certificate's ES256 key; and
+// 4. the payload claims (iss/aud/etc.) match Apple's documented values.
+// This helper performs the full verification pipeline and returns the
+// trusted payload when everything checks out.
 async function verifyAppleJWS(signedPayload: string): Promise<any> {
   try {
-    console.log('Verifying Apple JWS signature...')
-    
     const parts = signedPayload.split('.')
     if (parts.length !== 3) {
       throw new Error(`Invalid JWT format: expected 3 parts, got ${parts.length}`)
     }
-    
-    const header = JSON.parse(atob(parts[0]))
-    
+
+    const header = JSON.parse(decodeBase64Url(parts[0]))
+
     if (!header.x5c || !Array.isArray(header.x5c) || header.x5c.length === 0) {
       throw new Error('Missing x5c certificate chain in JWT header')
     }
-    
-    const leafCertBase64 = header.x5c[0]
-    const certPem = `-----BEGIN CERTIFICATE-----\n${leafCertBase64.match(/.{1,64}/g)?.join('\n')}\n-----END CERTIFICATE-----`
-    
-    const publicKey = await jose.importX509(certPem, header.alg || 'ES256')
-    
+
+    const alg = typeof header.alg === 'string' ? header.alg.toUpperCase() : ''
+    if (alg !== 'ES256') {
+      throw new Error(`Unsupported JWS algorithm: ${header.alg}`)
+    }
+
+    if (header.typ && String(header.typ).toUpperCase() !== 'JWT') {
+      throw new Error(`Unexpected JWS type: ${header.typ}`)
+    }
+
+    await validateCertificateChain(header.x5c)
+
+    const leafPem = derBase64ToPem(header.x5c[0])
+    const publicKey = await jose.importX509(leafPem, 'ES256')
+
     const { payload } = await jose.jwtVerify(signedPayload, publicKey, {
-      algorithms: ['ES256', 'RS256'],
+      algorithms: ['ES256'],
       clockTolerance: 60
     })
-    
-    console.log('Apple JWS signature verified successfully')
+
     return payload
   } catch (error) {
     console.error('Apple JWS verification failed:', error)
-    throw new Error(`Apple JWS verification failed: ${error.message}`)
+    const message = error instanceof Error ? error.message : String(error)
+    throw new Error(`Apple JWS verification failed: ${message}`)
   }
 }
 
@@ -49,14 +122,19 @@ async function decodeSignedTransactionInfo(signedTransactionInfo: string): Promi
     if (parts.length !== 3) {
       throw new Error('Invalid transaction JWT format')
     }
-    
+
     // Decode the payload (middle part)
-    const payload = JSON.parse(atob(parts[1]))
+    const payload = JSON.parse(decodeBase64Url(parts[1]))
     return payload
   } catch (error) {
     console.error('Failed to decode signedTransactionInfo:', error)
     return null
   }
+}
+
+function extractBundleId(payload: any): string | undefined {
+  const candidate = payload?.data?.bundleId ?? payload?.data?.bundleIdentifier
+  return typeof candidate === 'string' ? candidate : undefined
 }
 
 serve(async (req) => {
@@ -69,18 +147,8 @@ serve(async (req) => {
                    req.headers.get('cf-connecting-ip') || // Cloudflare
                    'unknown'
   
-  // Get all headers for logging
-  const allHeaders = Object.fromEntries(req.headers.entries())
-  
-  console.log(`[${requestId}] ==> Webhook Request Started`)
-  console.log(`[${requestId}] Method: ${req.method}`)
-  console.log(`[${requestId}] URL: ${req.url}`)
-  console.log(`[${requestId}] Source IP: ${sourceIP}`)
-  console.log(`[${requestId}] All Headers:`, allHeaders)
-  
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    console.log(`[${requestId}] CORS preflight request handled`)
     return new Response('ok', { headers: corsHeaders })
   }
 
@@ -88,25 +156,12 @@ serve(async (req) => {
   let body: any = null
   
   try {
-    // Get raw body first for logging purposes
+    // Get raw body for persistence and validation
     rawBody = await req.text()
-    console.log(`[${requestId}] Raw request body received, length: ${rawBody.length} bytes`)
-    
-    // Log the complete raw POST body
-    console.log(`[${requestId}] Raw POST body:`, rawBody)
     
     // Parse request body
-    console.log(`[${requestId}] Parsing request body...`)
     body = JSON.parse(rawBody)
     const { signedPayload } = body
-    
-    console.log(`[${requestId}] Request body parsed successfully`)
-    console.log(`[${requestId}] Body keys:`, Object.keys(body))
-    
-    // Log the parsed POST body
-    console.log(`[${requestId}] Parsed POST body:`, JSON.stringify(body, null, 2))
-
-    console.log(`[${requestId}] Apple Store Server Notification received`)
 
     if (!signedPayload) {
       console.error(`[${requestId}] ERROR: Missing signedPayload in request body`)
@@ -114,53 +169,88 @@ serve(async (req) => {
     }
 
     // Verify and decode the JWS
-    console.log(`[${requestId}] Starting JWS verification...`)
     const payload = await verifyAppleJWS(signedPayload)
-    console.log(`[${requestId}] JWS verified successfully`)
-    console.log(`[${requestId}] Notification type: ${payload.notificationType}`)
-    console.log(`[${requestId}] Subtype: ${payload.subtype || 'N/A'}`)
-    console.log(`[${requestId}] Notification UUID: ${payload.notificationUUID}`)
-    console.log(`[${requestId}] Environment: ${payload.data?.environment || 'Unknown'}`)
-    
+
+    if (!payload || typeof payload !== 'object') {
+      throw new Error('Invalid notification payload structure')
+    }
+
+    if (!payload.notificationUUID || typeof payload.notificationUUID !== 'string') {
+      throw new Error('Missing notificationUUID in notification payload')
+    }
+
+    if (!payload.notificationType || typeof payload.notificationType !== 'string') {
+      throw new Error('Missing notificationType in notification payload')
+    }
+
+    if (!payload.data || typeof payload.data !== 'object') {
+      throw new Error('Missing data block in notification payload')
+    }
+
     // Initialize Supabase client
-    console.log(`[${requestId}] Initializing Supabase client...`)
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    console.log(`[${requestId}] Supabase client initialized`)
 
-    // Determine environment from payload and normalize it
-    const environment = normalizeEnvironment(payload.data?.environment)
-    console.log(`[${requestId}] Environment determined: ${environment}`)
-    
+    const { data: config, error: configError } = await supabase
+      .from('config')
+      .select('bundle_id')
+      .eq('id', 1)
+      .single()
+
+    if (configError || !config) {
+      throw new Error('Failed to load application configuration for bundle validation')
+    }
+
+    const expectedBundleId = config.bundle_id
+    if (!expectedBundleId) {
+      throw new Error('Bundle ID is not configured in the database')
+    }
+
+    const bundleIdFromPayload = extractBundleId(payload)
+    if (!bundleIdFromPayload) {
+      throw new Error('Missing bundleId in notification payload data')
+    }
+
+    if (bundleIdFromPayload !== expectedBundleId) {
+      throw new Error(`Bundle ID mismatch: expected ${expectedBundleId}, received ${bundleIdFromPayload}`)
+    }
+
+    const rawEnvironment = payload.data?.environment
+    if (typeof rawEnvironment !== 'string') {
+      throw new Error('Missing environment in notification payload data')
+    }
+
+    const environment = normalizeEnvironment(rawEnvironment)
+
+    const lowerEnvironment = rawEnvironment.toLowerCase()
+    if (lowerEnvironment !== 'production' && lowerEnvironment !== 'sandbox') {
+      throw new Error(`Unsupported environment value: ${rawEnvironment}`)
+    }
+
+    const signedDate = payload.signedDate ? new Date(payload.signedDate) : null
+    if (signedDate && Number.isNaN(signedDate.getTime())) {
+      throw new Error('Invalid signedDate in notification payload')
+    }
+
     // Decode signedTransactionInfo if present
     let decodedTransactionInfo = null
     if (payload.data?.signedTransactionInfo) {
-      console.log(`[${requestId}] Decoding signedTransactionInfo...`)
       decodedTransactionInfo = await decodeSignedTransactionInfo(payload.data.signedTransactionInfo)
-      if (decodedTransactionInfo) {
-        console.log(`[${requestId}] Transaction ID: ${decodedTransactionInfo.transactionId}`)
-        console.log(`[${requestId}] Original Transaction ID: ${decodedTransactionInfo.originalTransactionId || 'N/A'}`)
-        console.log(`[${requestId}] Product ID: ${decodedTransactionInfo.productId}`)
-      }
     }
     
     // Decode signedRenewalInfo if present
     let decodedRenewalInfo = null
     if (payload.data?.signedRenewalInfo) {
-      console.log(`[${requestId}] Decoding signedRenewalInfo...`)
       try {
         const parts = payload.data.signedRenewalInfo.split('.')
         if (parts.length === 3) {
-          decodedRenewalInfo = JSON.parse(atob(parts[1]))
+          decodedRenewalInfo = JSON.parse(decodeBase64Url(parts[1]))
         }
       } catch (error) {
         console.error(`[${requestId}] Failed to decode signedRenewalInfo:`, error)
       }
     }
-    
-    // Extract signed date from payload
-    const signedDate = payload.signedDate ? new Date(payload.signedDate) : null
     
     // Create modified payload with decoded transaction info
     const modifiedPayload = {
@@ -174,7 +264,6 @@ serve(async (req) => {
     
     // If this is a CONSUMPTION_REQUEST, store it in the dedicated table
     if (payload.notificationType === 'CONSUMPTION_REQUEST') {
-      console.log(`[${requestId}] Detected CONSUMPTION_REQUEST, storing in consumption_request_webhooks table...`)
       
       // Extract consumption request specific data
       const consumptionRequestReason = payload.data?.consumptionRequestReason?.reason || null
@@ -207,13 +296,10 @@ serve(async (req) => {
       if (consumptionError) {
         console.error(`[${requestId}] ERROR storing consumption request webhook:`, consumptionError)
         // Don't throw here, continue with normal processing
-      } else {
-        console.log(`[${requestId}] ✓ Consumption request webhook stored with ID: ${consumptionWebhook.id}`)
       }
     }
     
     // Store raw notification with decoded transaction info
-    console.log(`[${requestId}] Storing raw notification in database...`)
     const { data: notification, error: notificationError } = await supabase
       .from('notifications_raw')
       .insert({
@@ -237,8 +323,6 @@ serve(async (req) => {
       throw notificationError
     }
 
-    console.log(`[${requestId}] ✓ Notification stored successfully`)
-    console.log(`[${requestId}] Notification ID: ${notification.id}`)
     
     // Update consumption request webhook with notification_raw_id if it was a CONSUMPTION_REQUEST
     if (payload.notificationType === 'CONSUMPTION_REQUEST') {
@@ -252,7 +336,6 @@ serve(async (req) => {
     }
 
     // Trigger asynchronous processing of the notification
-    console.log(`[${requestId}] Triggering notification processing...`)
     const processUrl = `${supabaseUrl}/functions/v1/process-notifications`
     
     // Fire and forget - don't wait for processing to complete
@@ -265,16 +348,11 @@ serve(async (req) => {
       body: JSON.stringify({
         limit: 10  // Process up to 10 pending notifications
       })
-    }).then(() => {
-      console.log(`[${requestId}] Notification processing triggered successfully`)
     }).catch(error => {
       console.error(`[${requestId}] Failed to trigger notification processing:`, error)
     })
 
     const duration = Date.now() - startTime
-    console.log(`[${requestId}] ==> Request completed successfully`)
-    console.log(`[${requestId}] Total processing time: ${duration}ms`)
-    console.log(`[${requestId}] Returning success response with notification ID: ${notification.id}`)
 
     return new Response(
       JSON.stringify({ success: true, id: notification.id, requestId, processingTime: duration }),
@@ -286,31 +364,25 @@ serve(async (req) => {
 
   } catch (error) {
     const duration = Date.now() - startTime
+    const err = error instanceof Error ? error : new Error(String(error))
     console.error(`[${requestId}] ==> ERROR in webhook processing`)
-    console.error(`[${requestId}] Error type: ${error.name}`)
-    console.error(`[${requestId}] Error message: ${error.message}`)
-    console.error(`[${requestId}] Error stack:`, error.stack)
+    console.error(`[${requestId}] Error type: ${err.name}`)
+    console.error(`[${requestId}] Error message: ${err.message}`)
+    console.error(`[${requestId}] Error stack:`, err.stack)
     console.error(`[${requestId}] Processing time before error: ${duration}ms`)
     
     // Log failed request details for debugging
     console.error(`[${requestId}] Failed request details:`)
     console.error(`[${requestId}] - Source IP: ${sourceIP}`)
-    console.error(`[${requestId}] - Headers:`, allHeaders)
     if (rawBody) {
-      // Truncate very long payloads for logging
-      const truncatedBody = rawBody.length > 5000 ? 
-        rawBody.substring(0, 5000) + '... [truncated]' : 
-        rawBody
-      console.error(`[${requestId}] - Raw body: ${truncatedBody}`)
-    } else {
-      console.error(`[${requestId}] - Raw body: [not captured]`)
+      console.error(`[${requestId}] - Raw body length: ${rawBody.length} bytes`)
     }
     
     return new Response(
       JSON.stringify({ 
-        error: error.message,
+        error: err.message,
         requestId,
-        errorType: error.name,
+        errorType: err.name,
         processingTime: duration
       }),
       { 

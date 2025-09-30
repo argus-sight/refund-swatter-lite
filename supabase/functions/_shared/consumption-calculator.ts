@@ -44,8 +44,6 @@ export async function calculateConsumptionData(
 
     // If no transaction found, create a basic consumption data with defaults
     if (txError || !transaction) {
-      console.log(`No transaction found for ${originalTransactionId} in ${environment}, using defaults`)
-      
       // Get refund preference from config table (get the first/latest config)
       const { data: config } = await supabase
         .from('config')

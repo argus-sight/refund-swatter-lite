@@ -10,6 +10,7 @@ web/.env
 .mcp.json
 .claude
 CLAUDE.md
+AGENTS.md
 
 # Next.js
 web/.next/

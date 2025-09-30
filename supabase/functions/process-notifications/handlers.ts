@@ -36,10 +36,6 @@ export async function processConsumptionRequest(supabase: any, notification: any
   if (!originalTransactionId) {
     throw new Error('Missing originalTransactionId in CONSUMPTION_REQUEST notification')
   }
-  
-  console.log(`Processing CONSUMPTION_REQUEST for transaction: ${originalTransactionId}`)
-  console.log(`Reason: ${data.consumptionRequestReason?.reason || 'Not specified'}`)
-  
   const consumptionData = {
     notification_id: notification.id,
     original_transaction_id: originalTransactionId,
@@ -63,7 +59,6 @@ export async function processConsumptionRequest(supabase: any, notification: any
   
   // Update consumption_request_webhooks table with the consumption_request_id
   if (notification.notification_uuid) {
-    console.log(`Updating consumption_request_webhooks with consumption_request_id: ${consumptionRequest.id}`)
     await supabase
       .from('consumption_request_webhooks')
       .update({
@@ -103,8 +98,6 @@ export async function processConsumptionRequest(supabase: any, notification: any
 
   // Immediately send consumption data to Apple
   try {
-    console.log('Immediately sending consumption data to Apple...')
-    
     // Call send-consumption Edge Function directly
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -123,8 +116,6 @@ export async function processConsumptionRequest(supabase: any, notification: any
 
     if (sendResponse.ok) {
       const result = await sendResponse.json()
-      console.log('✓ Consumption data sent immediately:', result)
-      
       // Update request status to sent if successful
       await supabase
         .from('consumption_requests')

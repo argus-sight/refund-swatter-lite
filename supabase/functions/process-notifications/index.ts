@@ -62,9 +62,6 @@ serve(async (req) => {
     if (notificationId) {
       query = query.eq('id', notificationId)
     }
-
-    console.log('Processing notifications:', { notificationType, notificationId, limit })
-
     const { data: notifications, error: fetchError } = await query
 
     if (fetchError) {
@@ -235,7 +232,6 @@ async function processNotification(supabase: any, notification: any) {
 
     // ===== Other Types =====
     case 'TEST':
-      console.log('Test notification received')
       break
 
     case 'REVOKE':
@@ -243,7 +239,6 @@ async function processNotification(supabase: any, notification: any) {
       break
 
     default:
-      console.log(`Unhandled notification type: ${notification_type}`)
   }
 }
 
@@ -285,10 +280,6 @@ async function processConsumptionRequest(supabase: any, notification: any, trans
   if (!originalTransactionId) {
     throw new Error('Missing originalTransactionId in CONSUMPTION_REQUEST notification')
   }
-  
-  console.log(`Processing CONSUMPTION_REQUEST for transaction: ${originalTransactionId}`)
-  console.log(`Reason: ${data.consumptionRequestReason?.reason || 'Not specified'}`)
-  
   const consumptionData = {
     notification_id: notification.id,
     original_transaction_id: originalTransactionId,
@@ -312,7 +303,6 @@ async function processConsumptionRequest(supabase: any, notification: any, trans
   
   // Update consumption_request_webhooks table with the consumption_request_id
   if (notification.notification_uuid) {
-    console.log(`Updating consumption_request_webhooks with consumption_request_id: ${consumptionRequest.id}`)
     await supabase
       .from('consumption_request_webhooks')
       .update({
@@ -354,8 +344,6 @@ async function processConsumptionRequest(supabase: any, notification: any, trans
 
   // Immediately send consumption data to Apple
   try {
-    console.log('Immediately sending consumption data to Apple...')
-    
     // Call send-consumption Edge Function directly
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -374,8 +362,6 @@ async function processConsumptionRequest(supabase: any, notification: any, trans
 
     if (sendResponse.ok) {
       const result = await sendResponse.json()
-      console.log('✓ Consumption data sent immediately:', result)
-      
       // Update request status to sent if successful
       await supabase
         .from('consumption_requests')
@@ -476,17 +462,14 @@ async function processExpired(supabase: any, notification: any, transactionInfo:
 
 async function processFailedRenewal(supabase: any, notification: any, transactionInfo: any, subtype: string) {
   // Log failed renewal attempt
-  console.log(`Failed renewal for transaction: ${transactionInfo?.originalTransactionId}, subtype: ${subtype}`)
 }
 
 async function processGracePeriodExpired(supabase: any, notification: any, transactionInfo: any) {
   // Log grace period expiration
-  console.log(`Grace period expired for transaction: ${transactionInfo?.originalTransactionId}`)
 }
 
 async function processRefundDeclined(supabase: any, notification: any, transactionInfo: any) {
   // Log declined refund
-  console.log(`Refund declined for transaction: ${transactionInfo?.originalTransactionId}`)
 }
 
 async function processRefundReversed(supabase: any, notification: any, transactionInfo: any) {
@@ -505,7 +488,6 @@ async function processRefundReversed(supabase: any, notification: any, transacti
 
 async function processRenewalPrefChange(supabase: any, notification: any, transactionInfo: any, subtype: string) {
   // Log preference change
-  console.log(`Renewal preference changed: ${subtype} for transaction: ${transactionInfo?.originalTransactionId}`)
 }
 
 async function processOfferRedeemed(supabase: any, notification: any, transactionInfo: any, subtype: string, environment: string) {
@@ -515,10 +497,8 @@ async function processOfferRedeemed(supabase: any, notification: any, transactio
 
 async function processPriceIncrease(supabase: any, notification: any, transactionInfo: any, subtype: string) {
   // Log price increase notification
-  console.log(`Price increase notification: ${subtype} for transaction: ${transactionInfo?.originalTransactionId}`)
 }
 
 async function processRevoke(supabase: any, notification: any, transactionInfo: any) {
   // Handle family sharing revocation
-  console.log(`Family sharing revoked for transaction: ${transactionInfo?.originalTransactionId}`)
 }

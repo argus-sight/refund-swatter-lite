@@ -83,8 +83,6 @@ serve(async (req) => {
     let lastResponse = null
     
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      console.log(`Attempt ${attempt} of ${MAX_RETRIES} to check test notification status`)
-      
       const startTime = Date.now()
       const response = await fetch(apiUrl, {
         method: 'GET',
@@ -97,9 +95,6 @@ serve(async (req) => {
       const data = await response.json()
       lastResponse = response
       lastData = data
-      
-      console.log(`Apple status check response (attempt ${attempt}):`, JSON.stringify(data, null, 2))
-      
       // Log the API request to apple_api_logs table
       const { error: logError } = await supabaseAdmin.from('apple_api_logs').insert({
         endpoint: apiUrl,
@@ -118,7 +113,6 @@ serve(async (req) => {
       // Check if we got a successful response
       if (response.ok) {
         // If we got a success, return the data
-        console.log('Successfully retrieved test notification status')
         lastError = null
         break
       }
@@ -126,12 +120,10 @@ serve(async (req) => {
       // Check for specific error that requires retry
       if (data.errorCode === 4040010 || 
           (data.errorMessage && data.errorMessage.includes('expired or the notification and status are not yet available'))) {
-        console.log('Token expired or not yet available, will retry...')
         lastError = data
         
         // If not the last attempt, wait before retrying
         if (attempt < MAX_RETRIES) {
-          console.log(`Waiting ${RETRY_DELAY}ms before retry...`)
           await new Promise(resolve => setTimeout(resolve, RETRY_DELAY))
         }
       } else {
