@@ -269,6 +269,14 @@ async function processRefund(supabase: any, notification: any, transactionInfo: 
     })
 
   if (error) throw new Error(`Failed to process refund: ${error.message}`)
+
+  await supabase
+      .from('consumption_requests')
+      .update({
+        status: 'refunded',
+        updated_at: new Date().toISOString()
+      })
+      .eq('original_transaction_id', originalTransactionId)
 }
 
 async function processConsumptionRequest(supabase: any, notification: any, transactionInfo: any, data: any, environment: string) {
@@ -470,6 +478,18 @@ async function processGracePeriodExpired(supabase: any, notification: any, trans
 
 async function processRefundDeclined(supabase: any, notification: any, transactionInfo: any) {
   // Log declined refund
+  if (!transactionInfo) return
+
+  // For refunds, use originalTransactionId if available, otherwise use transactionId
+  const originalTransactionId = transactionInfo.originalTransactionId || transactionInfo.transactionId
+
+  await supabase
+      .from('consumption_requests')
+      .update({
+        status: 'declined',
+        updated_at: new Date().toISOString()
+      })
+      .eq('original_transaction_id', originalTransactionId)
 }
 
 async function processRefundReversed(supabase: any, notification: any, transactionInfo: any) {
