@@ -91,6 +91,18 @@ else
     fi
 fi
 
+if [ -n "$SUPABASE_SECRET_KEY" ]; then
+    SUPABASE_SECRET_KEY="$SUPABASE_SECRET_KEY"
+else
+    echo ""
+    echo -e "${YELLOW}secret key required${NC}"
+    echo "  --> Visit Supabase Dashboard > Project Settings > API key > Secret Key."
+    echo "  --> Copy the 'secret' key (never share it publicly)."
+    echo ""
+    exit 1
+fi
+
+
 # Step 3: Generate web/.env from .env.project values
 echo -e "${YELLOW}Step 3: Generating environment files...${NC}"
 
@@ -262,7 +274,7 @@ echo ""
 echo -e "${YELLOW}Step 9: Creating admin user...${NC}"
 SETUP_ADMIN_RESPONSE=$(curl -s -X POST \
   "${API_URL}/functions/v1/setup-admin" \
-  -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" \
+  -H "Authorization: Bearer ${SUPABASE_SECRET_KEY}" \
   -H "Content-Type: application/json")
 
 if [ -z "$SETUP_ADMIN_RESPONSE" ]; then
